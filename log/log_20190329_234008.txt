@@ -1,8 +1,0 @@
-INFO : CALL PLAYER CALLS!
-INFO : 
-
-
-INFO : Street: preflop
-INFO : Hole cards: ['H7', 'D4']
-INFO : Community cards: []
-INFO : Valid actions: [{'action': 'fold'}, {'action': 'call'}, {'action': 'raise'}]
