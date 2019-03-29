@@ -1,26 +1,25 @@
 from pypokerengine.players import BasePokerPlayer
 import random as rand
 import pprint
-from helper_functions import placeBet, chanceNode, getValidActions, actionNode
-from copy import deepcopy
+from helper_functions import chanceNode
 import logging
 import time
 
 
 class MiniMaxPlayer(BasePokerPlayer):
 
-  def declare_action(self, valid_actions, hole_card, round_state_ori):
+  def declare_action(self, valid_actions, hole_card, round_state):
     # =========================================== #
     # EXTRACT ROUND STATE INFO
     # =========================================== #
-    player = round_state_ori["next_player"]
-    opp = (player + 1) % 2
-    currStreet = round_state_ori["street"]
+    commCards = round_state["community_card"]
+    potAmt = round_state["pot"]["main"]["amount"]
+    currStreet = round_state["street"]
 
     logging.info("\n\n")
     logging.info("Street: {}".format(currStreet))
     logging.info("Hole cards: {}".format(hole_card))
-    logging.info("Community cards: {}".format(round_state_ori["community_card"]))
+    logging.info("Community cards: {}".format(round_state["community_card"]))
     logging.info("Valid actions: {}".format(valid_actions))
 
 
@@ -30,9 +29,8 @@ class MiniMaxPlayer(BasePokerPlayer):
     # =========================================== #
     # DON'T CONSIDER ACTION
     # =========================================== #
-    round_state = deepcopy(round_state_ori)
-    round_state["opp_card"] = []
-    payout = chanceNode(hole_card, round_state, DEPTH)
+    oppCards = []
+    payout = chanceNode(hole_card, commCards, oppCards, potAmt, DEPTH)
     if payout < 0:
       idx = 0
     else:

@@ -1,7 +1,6 @@
 # =========================================== #
 # FILE: minimax_player.py
 # =========================================== #
-
 class MiniMaxPlayer(BasePokerPlayer):
 
   def declare_action(self, valid_actions, hole_card, round_state_ori):
@@ -72,6 +71,25 @@ class MiniMaxPlayer(BasePokerPlayer):
 # =========================================== #
 # FILE: helper_functions.py
 # =========================================== #
+def placeBet(roundState, player, amt):
+  roundState["pot"]["main"]["amount"] += amt
+  roundState["seats"][player]["stack"] -= amt
+  return roundState
+
+
+
+def getValidActions(roundState, player, numRaiseLeft):
+  opp = (player + 1) % 2
+  playerStack = roundState["seats"][player]["stack"]
+  oppStack = roundState["seats"][opp]["stack"]
+  
+  validActions = [{'action': 'fold'}, {'action': 'call'}]
+  if numRaiseLeft > 0 and playerStack >= 20 and oppStack >= 10:
+    validActions.append({'action': 'raise'})
+
+  return validActions
+
+
 
 def evaluateHand(holeCards, roundState, depth):
   ######### DEBUG #########

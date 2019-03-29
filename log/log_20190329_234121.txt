@@ -1,0 +1,47 @@
+INFO : CALL PLAYER CALLS!
+INFO : 
+
+
+INFO : Street: preflop
+INFO : Hole cards: ['C8', 'C4']
+INFO : Community cards: []
+INFO : Valid actions: [{'action': 'fold'}, {'action': 'call'}, {'action': 'raise'}]
+INFO : Time taken: 0 min 0.332 s
+INFO : Payout: 0
+INFO : 
+
+
+INFO : CALL PLAYER CALLS!
+INFO : 
+
+
+INFO : Street: flop
+INFO : Hole cards: ['C8', 'C4']
+INFO : Community cards: ['SQ', 'SA', 'DJ']
+INFO : Valid actions: [{'action': 'fold'}, {'action': 'call'}, {'action': 'raise'}]
+INFO : Time taken: 0 min 0.000 s
+INFO : Payout: 0
+INFO : 
+
+
+INFO : CALL PLAYER CALLS!
+INFO : 
+
+
+INFO : Street: turn
+INFO : Hole cards: ['C8', 'C4']
+INFO : Community cards: ['SQ', 'SA', 'DJ', 'H6']
+INFO : Valid actions: [{'action': 'fold'}, {'action': 'call'}, {'action': 'raise'}]
+INFO : Time taken: 0 min 0.000 s
+INFO : Payout: 0
+INFO : 
+
+
+INFO : CALL PLAYER CALLS!
+INFO : 
+
+
+INFO : Street: river
+INFO : Hole cards: ['C8', 'C4']
+INFO : Community cards: ['SQ', 'SA', 'DJ', 'H6', 'C9']
+INFO : Valid actions: [{'action': 'fold'}, {'action': 'call'}, {'action': 'raise'}]
