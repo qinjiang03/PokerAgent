@@ -7,7 +7,7 @@ from custom.logging_functions import startLogging, stopLogging
 import datetime
 import os
 
-logFile = os.path.join('log', "log_{}.txt".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
+logFile = os.path.join('log', "log_{}.log".format(datetime.datetime.now().strftime("%Y%m%d_%H%M%S")))
 logger = startLogging(logFile)
 
 #TODO:config the config as our wish
