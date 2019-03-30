@@ -20,6 +20,10 @@ def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
     payout = potAmt / 2
   else:
     payout = -potAmt
+
+  ######### DEBUG #########
+  # logging.info("Showdown: myScore: {}; oppScore: {}; payout: {}".format(myScore, oppScore, payout))
+  ######### DEBUG #########
   return payout
 
 
@@ -27,12 +31,19 @@ def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
 
 def evaluationFunc(holeCards, commCards, oppCards, potAmt):
   payout = 0
+  ######### DEBUG #########
+  # logging.info("Terminate: payout: {}".format(payout))
+  ######### DEBUG #########
   return payout
 
 
 
 
 def evaluateHand(holeCards, commCards, oppCards, potAmt, depth):
+  ######### DEBUG #########
+  # logging.info("Evaluate hand: depth: {}".format(depth))
+  ######### DEBUG #########
+
   if len(oppCards) == 2:
     payout = evaluateShowdown(holeCards, commCards, oppCards, potAmt)
   elif depth <= 1:
@@ -68,6 +79,10 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
       else:
         newOppCards = newOppCards + [nextCard]
       
+      ######### DEBUG #########
+      # logging.info("hole: {}; comm: {}; opp: {}".format(holeCards, newCommCards, newOppCards))
+      ######### DEBUG #########
+
       # =========================================== #
       # OPEN MORE CARDS OR EVALUATE HAND
       # =========================================== #
@@ -75,7 +90,6 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
         payout = chanceNode(holeCards, newCommCards, newOppCards, potAmt, depth)
       else:
         payout = evaluateHand(holeCards, newCommCards, newOppCards, potAmt, depth)
-        
       payouts.append(payout)
     
   expectedPayout = sum(payouts) / len(payouts)
