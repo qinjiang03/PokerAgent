@@ -6,7 +6,7 @@ import logging
 class CallPlayer(BasePokerPlayer):
 
   def declare_action(self, valid_actions, hole_card, round_state):
-    logging.info("CALL PLAYER CALLS!")
+    # print("CALL PLAYER CALLS!")
     
     for i in valid_actions:
         if i["action"] == "call":

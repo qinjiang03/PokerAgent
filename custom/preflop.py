@@ -28,10 +28,7 @@ def getDeck():
     suits = ['D','C','H','S']
     values = [str(i) for i in range(2,10)] + ['T','J','Q','K','A']
     deck = []
-    for suit in suits:
-        for value in values:
-            card = suit + value
-            deck.append(card)
+    deck = [suit + value for value in values for suit in suits]
     return deck
 
 
@@ -46,10 +43,8 @@ def exportProb(holeCards, winProb):
 
 
 
-def calcProb():
+def calcProb(holeCards):
     deck = getDeck()
-    # holeCards, deck = dealCards(deck, n=2)
-    holeCards = ['S7', 'H7']
     outcomes = []
     numIters = 10000
     for i in range(0,numIters):
@@ -69,25 +64,25 @@ def calcProb():
 
 
 
-def lookupProb():
+def lookupProb(holeCards):
     # =========================================== #
     # Read data as dict (from NatesHoldem)
     # =========================================== #
-    filename = "preflopProb.csv"
+    filename = "custom/preflopProb.csv"
     with open(filename,'r') as file:
         reader = csv.reader(file)
         table = {rows[0]:rows[1] for rows in reader}
     
-    
-    holeCards = ['SA', 'HA']
     hand = "".join([card[1] for card in holeCards])
     if holeCards[0][0] == holeCards[1][0]:
         hand += "s"
     elif holeCards[0][1] != holeCards[1][1]:
         hand += "o"
-
-    prob = float(table[hand])
-    print(prob)
+    try:
+        prob = float(table[hand])
+    except KeyError:
+        hand = hand[1] + hand[0] + hand[2:]
+        prob = float(table[hand])
     return prob
 
 
@@ -97,7 +92,8 @@ if __name__ == "__main__":
     # logFile = "preflop_{}.log".format(datetime.now().strftime("%Y%m%d_%H%M%S"))
     # logger = startLogging(logFile)
     
-    # calcProb()
-    lookupProb()
+    holeCards = ['SA', 'HA']
+    # calcProb(holeCards)
+    # lookupProb(holeCards)
     
     # stopLogging(logger)
