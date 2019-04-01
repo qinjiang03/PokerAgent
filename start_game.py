@@ -11,7 +11,7 @@ logFile = os.path.join('log', "log_{}.log".format(datetime.datetime.now().strfti
 logger = startLogging(logFile)
 
 #TODO:config the config as our wish
-config = setup_config(max_round=1, initial_stack=10000, small_blind_amount=10)
+config = setup_config(max_round=2, initial_stack=10000, small_blind_amount=10)
 
 
 

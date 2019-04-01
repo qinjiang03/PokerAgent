@@ -41,22 +41,30 @@ def evaluateHand(holeCards, commCards, oppCards, potAmt, depth):
 
 
 
-def getDeck():
+def getNewDeck():
   suits = ['D','C','H','S']
   values = [str(i) for i in range(2,10)] + ['T','J','Q','K','A']
   deck = [suit + value for value in values for suit in suits]
   return deck
 
 
+def reduceDeck(deck, cardsToReduce):
+  deck = list(set(deck) - set(cardsToReduce))
+  return deck
+
+def getAllCombins(deck, n):
+  combins = list(itertools.combinations(deck, n))
+  return combins
+
 
 def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
-  deck = getDeck()
-  deck = list(set(deck) - set(holeCards + commCards + oppCards))
-
   if len(commCards) < 3:     n = 3
   elif len(commCards) == 5:  n = 2
   else:                      n = 1
-  combins = list(itertools.combinations(deck, n))
+  
+  deck = getNewDeck()
+  deck = reduceDeck(deck, holeCards + commCards + oppCards)
+  combins = getAllCombins(deck, n)
 
   payouts = []
   for combin in combins:

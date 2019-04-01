@@ -2,6 +2,7 @@ import logging
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 from logging_functions import startLogging, stopLogging
+from helper_functions import getNewDeck, reduceDeck
 from datetime import datetime
 import random
 import csv
@@ -24,32 +25,17 @@ def evaluateShowdown(holeCards, commCards, oppCards):
     else:                         return -1
 
 
-def getDeck():
-    suits = ['D','C','H','S']
-    values = [str(i) for i in range(2,10)] + ['T','J','Q','K','A']
-    deck = []
-    deck = [suit + value for value in values for suit in suits]
-    return deck
-
-
-def dealCards(deck, n):
-    dealtCards = random.sample(deck, n)
-    deck = list(set(deck) - set(dealtCards))
-    return dealtCards, deck
-
-
-def exportProb(holeCards, winProb):
-    return
-
-
 
 def calcProb(holeCards):
-    deck = getDeck()
+    deck = getNewDeck()
     outcomes = []
     numIters = 10000
     for i in range(0,numIters):
-        commCards, deck = dealCards(deck, n=5)
-        oppCards, deck = dealCards(deck, n=2)
+        commCards = random.sample(deck, 5)
+        deck = reduceDeck(deck, commCards)
+        oppCards = random.sample(deck, 2)
+        deck = reduceDeck(deck, oppCards)
+
         outcome = evaluateShowdown(holeCards, commCards, oppCards)
         outcomes.append(outcome)
         deck = deck + commCards + oppCards
@@ -58,9 +44,7 @@ def calcProb(holeCards):
     winProb = numWins * 1.0 /numIters * 100
     print("holeCards: {}".format(holeCards))
     print("numWins: {}; winProb: {:.3f}".format(numWins, winProb))
-    exportProb(holeCards, winProb)
     return
-
 
 
 

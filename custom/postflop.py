@@ -1,6 +1,7 @@
 import logging
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
+from helper_functions import getNewDeck, reduceDeck, getAllCombins
 
 
 
@@ -15,32 +16,25 @@ def getScore(holeCards, commCards):
     return myScore
 
 
-def dealCard(holeCards):
-    suits = ['D','C','H','S']
-    values = [str(i) for i in range(2,10)] + ['T','J','Q','K','A']
+def calcScore():
+    deck = getNewDeck()
+    n = 2
+    combins = getAllCombins(deck, n)
     
-    scores = []
     commCards = []
-    for suit in suits:
-        for value in values:
-            card = suit + value
-            if card in holeCards + commCards: continue
-            newHoleCards = holeCards + [card]
-            if len(newHoleCards) < 2:
-                score = dealCard(newHoleCards)
-            else:
-                score = getScore(newHoleCards, commCards)
-                # print("holeCards: {};\tscore: {}".format(newHoleCards, score))
-            
-            scores.append([newHoleCards, score])
-
+    scores = []
+    for combin in combins:
+        holeCards = list(combin)
+        score = getScore(holeCards, commCards)
+        # print("holeCards: {};\tscore: {}".format(newHoleCards, score))
+        scores.append([holeCards, score])
     return scores
 
 
 
 if __name__ == "__main__":
     holeCards = []
-    scores = dealCard(holeCards)
+    scores = calcScore()
     
     import pandas as pd
     df = pd.DataFrame(scores)
