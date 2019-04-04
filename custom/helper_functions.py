@@ -2,6 +2,7 @@ import logging
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 import itertools
+import csv
 
 
 
@@ -82,4 +83,28 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
 
 
 
+def lookupProb(holeCards):
+  # =========================================== #
+  # Read data as dict (from NatesHoldem)
+  # =========================================== #
+  filename = "custom/preflopProb.csv"
+  with open(filename,'r') as file:
+      reader = csv.reader(file)
+      table = {rows[0]:rows[1] for rows in reader}
+  
+  hand = "".join([card[1] for card in holeCards])
+  if holeCards[0][0] == holeCards[1][0]:    hand += "s"
+  elif holeCards[0][1] != holeCards[1][1]:  hand += "o"
+  try:
+      prob = float(table[hand])
+  except KeyError:
+      hand = hand[1] + hand[0] + hand[2:]
+      prob = float(table[hand])
+  return prob
+  
 
+
+
+# from pypokerengine.engine.action_checker import ActionChecker
+# def getValidActions():
+#   raise_amount,raise_limit = ActionChecker.round_raise_amount(sb_amount,street)
