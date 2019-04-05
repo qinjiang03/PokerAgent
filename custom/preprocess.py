@@ -95,7 +95,7 @@ def monteCarloSimulation(file, nSims):
         writer = csv.writer(f, delimiter=",")
         writer.writerow(df.columns)
         for i, row in df.iterrows():
-            if i < 20200: continue
+            if i < 105800: continue
             holeCards = literal_eval(row["holeCards"])
             commCards = literal_eval(row["commCards"])
             win_rate = estimate_hole_card_win_rate(
@@ -111,10 +111,6 @@ def monteCarloSimulation(file, nSims):
 
 
 if __name__ == "__main__":
-    # genUniqCombins2(3)
+    genUniqCombins2(4)
     
-    import time
-    t0 = time.time()
-    monteCarloSimulation(file="flopCombins_n3.csv", nSims=1000)
-    t1 = time.time()
-    print(t1 - t0)
+    # monteCarloSimulation(file="flopCombins_n3.csv", nSims=1000)
