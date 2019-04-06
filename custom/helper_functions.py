@@ -22,6 +22,19 @@ def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
   return payout
 
 
+def getHandStrength(holeCards, commCards):
+  holeCards = [Card.from_str(card) for card in holeCards]
+  commCards = [Card.from_str(card) for card in commCards]
+  score = HandEvaluator.eval_hand(holeCards, commCards)
+  return score
+
+
+def printFeatures(*args):
+  for arg in args:
+    print(arg)
+  return
+
+
 
 
 def evaluationFunc(holeCards, commCards, oppCards, potAmt):

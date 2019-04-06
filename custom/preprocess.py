@@ -95,7 +95,7 @@ def monteCarloSimulation(file, nSims):
         writer = csv.writer(f, delimiter=",")
         writer.writerow(df.columns)
         for i, row in df.iterrows():
-            if i < 111500: continue
+            if i < 150200: continue
             holeCards = literal_eval(row["holeCards"])
             commCards = literal_eval(row["commCards"])
             win_rate = estimate_hole_card_win_rate(

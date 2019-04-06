@@ -22,7 +22,7 @@ class MiniMaxPlayer(BasePokerPlayer):
         payout = -round_state["pot"]["main"]["amount"]
       else:
         if action == "call":
-          
+          pass
         else:
           if currStreet == "preflop": add_amt = 20
           elif currStreet == "river": add_amt = 40
