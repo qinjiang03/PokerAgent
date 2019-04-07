@@ -29,11 +29,11 @@ def getHandStrength(holeCards, commCards):
   return score
 
 
-def printFeatures(*args):
-  for arg in args:
-    print(arg)
-  return
-
+def getMaxHandStrength():
+  holeCards = ['SA','SK']
+  commCards = ['SQ','SJ','ST','S9','S7']
+  score = getHandStrength(holeCards, commCards)
+  return score
 
 
 
@@ -96,7 +96,23 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
 
 
 
-def lookupProb(holeCards):
+def mapCardsToKey(holeCards, commCards):
+  SUITS = ['D','C','H','S']
+  VALUES = ['A','K','Q','J','T'] + [str(i) for i in range(9,1,-1)]
+  suitCount = [sum(card[0] == suit for card in holeCards) + sum(card[0] == suit for card in commCards) for suit in SUITS]
+  valueCount = [sum(card[1] == value for card in holeCards) + sum(card[1] == value for card in commCards) for value in VALUES]
+  
+  suitCount.sort(reverse=True)
+  suitKey = "".join([str(i) for i in suitCount])
+  valueKey = "".join([str(value) * valueCount[i] for i,value in enumerate(VALUES) if valueCount[i] != 0])
+  key = suitKey + "_" + valueKey
+  return key
+
+
+
+
+
+def lookupProb_ori(holeCards):
   # =========================================== #
   # Read data as dict (from NatesHoldem)
   # =========================================== #
@@ -118,6 +134,3 @@ def lookupProb(holeCards):
 
 
 
-# from pypokerengine.engine.action_checker import ActionChecker
-# def getValidActions():
-#   raise_amount,raise_limit = ActionChecker.round_raise_amount(sb_amount,street)

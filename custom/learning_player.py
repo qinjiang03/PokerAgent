@@ -8,7 +8,8 @@ from pypokerengine.engine.card import Card
 
 class LearningPlayer(BasePokerPlayer):
 
-  def getHandStrength(self, holeCards, commCards):
+  @staticmethod
+  def getHandStrength(holeCards, commCards):
     holeCards = [Card.from_str(card) for card in holeCards]
     commCards = [Card.from_str(card) for card in commCards]
     score = HandEvaluator.eval_hand(holeCards, commCards)
@@ -17,7 +18,7 @@ class LearningPlayer(BasePokerPlayer):
 
   def getFeatures(self, hole_card, round_state):
     MAX_HAND_STR = 8429805.0
-    STREET_NUM = {"preflop": 1, "flop": 2, "turn": 3, "river": 4}
+    STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4}
 
     potAmt = round_state["pot"]["main"]["amount"]
     stacks = [seat["stack"] for seat in round_state["seats"]]
@@ -27,16 +28,16 @@ class LearningPlayer(BasePokerPlayer):
     stackFracs = [stack * 1.0 / TOTAL_STACK for stack in stacks]
 
     handStr = [self.getHandStrength(hole_card, round_state["community_card"]) / MAX_HAND_STR]
-    streetNum = [value for street, value in STREET_NUM.items() if round_state["street"] == street]
+    streetNum = [num for street, num in STREETS.items() if round_state["street"] == street]
     isSmallBlind = [round_state["next_player"] == round_state["small_blind_pos"]]
     numRaiseSelf = [sum(1 if history["action"] == "RAISE" and history["uuid"] == self.uuid else 0 \
                     for history in round_state["action_histories"][street]) / 4.0 \
                     if street in round_state["action_histories"] else 0 \
-                    for street in ["preflop", "flop", "turn", "river"]]
+                    for street in STREETS.keys()]
     numRaiseOpp = [sum(1 if history["action"] == "RAISE" and history["uuid"] != self.uuid else 0 \
                     for history in round_state["action_histories"][street]) / 4.0 \
                     if street in round_state["action_histories"] else 0 \
-                    for street in ["preflop", "flop", "turn", "river"]]
+                    for street in STREETS.keys()]
     totalRaiseSelf = [sum(numRaiseSelf)]
     totalRaiseOpp = [sum(numRaiseOpp)]
     
@@ -52,7 +53,8 @@ class LearningPlayer(BasePokerPlayer):
     ################## Features ################## 
     features = self.getFeatures(hole_card, round_state)
     
-    
+    # pp = pprint.PrettyPrinter(indent=2)
+    # pp.pprint(round_state)
     ################## Actions ##################
     if round_state["street"] == "preflop":
       action = valid_actions[1]
@@ -85,6 +87,13 @@ class LearningPlayer(BasePokerPlayer):
     pass
 
   def receive_round_result_message(self, winners, hand_info, round_state):
+    pp = pprint.PrettyPrinter(indent=2)
+    print("winners")
+    pp.pprint(winners)
+    print("handinfo")
+    pp.pprint(hand_info)
+    print("round_state")
+    pp.pprint(round_state)
     pass
 
 def setup_ai():

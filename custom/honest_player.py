@@ -11,7 +11,7 @@ class HonestPlayer(BasePokerPlayer):
       action = valid_actions[1]
     else:
       win_rate = estimate_hole_card_win_rate(
-        nb_simulation=250,
+        nb_simulation=100,
         nb_player=2,
         hole_card = gen_cards(hole_card),
         community_card = gen_cards(round_state["community_card"]))
@@ -38,9 +38,9 @@ class HonestPlayer(BasePokerPlayer):
     pass
 
   def receive_round_result_message(self, winners, hand_info, round_state):
-    print("\n\nHAND INFO")
-    pp = pprint.PrettyPrinter(indent=2)
-    pp.pprint(hand_info)
+    # print("\n\nHAND INFO")
+    # pp = pprint.PrettyPrinter(indent=2)
+    # pp.pprint(hand_info)
     pass
 
 def setup_ai():
