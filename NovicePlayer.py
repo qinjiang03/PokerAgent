@@ -21,27 +21,34 @@ class NovicePlayer(BasePokerPlayer):
     #opponent must be consistent at least within 30 - 50 rounds
     self.raiseEHS = list()
     self.callEHS = list()
-    self.current_round_player_action_history = list() #list of 4 lists for each round
-    self.current_round_opp_action_history = list()
+
+    self.current_round_player_action_history = list(list(), list(), list(), list()) #list of 4 lists for each round
+    self.current_round_opp_action_history = list(list(), list(), list(), list())
+    
     self.action_tree = SequenceActionTree()
     self.action_tree.generate_tree(20)
     self.hole_card = None
 
   def declare_action(self, valid_actions, hole_card, round_state):
-    # valid_actions format => [raise_action_pp = pprint.PrettyPrinter(indent=2)
-    #pp = pprint.PrettyPrinter(indent=2)
+    current_street = action_histories['street']
+    c_street = 0
+    if current_street == 'preflop'
+      c_street = 0
+    elif current_street == 'flop'
+      c_street = 1
+    elif current_street == 'turn'
+      c_street = 2
+    elif current_street == 'river'
+      c_street = 3
+
+    s = size(round_state.action_histories[current_street])
+    current_round_opp_action_history[c_street].append(round_state.action_histories[s - 1])
+
     action = "fold"
-    if round_state["street"] == "river":
-      for i in valid_actions:
-          if i["action"] == "raise":
-            action = i["action"]
-            return action
-      action = "call"
-    else:
-      for i in valid_actions:
-          if i["action"] == "call":
-            action = i["action"]
-            return action 
+    for i in valid_actions:
+        if i["action"] == "call":
+          action = i["action"]
+          return action 
     return action  # action returned here is sent to the poker engine
 
   def receive_game_start_message(self, game_info):
@@ -49,7 +56,6 @@ class NovicePlayer(BasePokerPlayer):
 
   
   def receive_round_start_message(self, round_count, hole_card, seats):
-    #get current hold card
     self.hole_card = hole_card
     
   def receive_street_start_message(self, street, round_state):
@@ -60,15 +66,18 @@ class NovicePlayer(BasePokerPlayer):
 
   def receive_round_result_message(self, winners, hand_info, round_state):
     #get opp card from here
-    #opp_cards = hand_info
-    opp_card = self.hole_card
-    update_after_showdown(opp_cards, comm_cards_river)
+    opp_card = hand_info['hand']['card']
+    update_after_showdown(opp_card, comm_cards_river)
     
   def update_after_showdown(self, opp_card, comm_cards_river):
     EHS_opp = PlayerUtil.hand_strength(opp_card, comm_cards_river)
-    SequenceActionTree.c
     SequenceActionTree.search_node_by_name()
-    EHS_opp
+
+    EHS_opp = PlayerUtil.effective_hand_strength(opp_card, comm_cards_river - comm_cards_river[size(comm_cards_river) - 1])
+    SequenceActionTree.search_node_by_name()
+    
+    EHS_opp = PlayerUtil.effective_hand_strength(opp_card, comm_cards_river - comm_cards_river[size(comm_cards_river) - 1])
+    SequenceActionTree.search_node_by_name()
     
   def setup_ai():
     return NovicePlayer()
@@ -222,6 +231,10 @@ class HistoryCell:
   #if we are small blind, first action is call, and opp first action is raise
   #if we are big blind, first action is raise, then act normally
 class SequenceActionTree: 
+  def __init__(self):
+    self.no_nodes = 0
+    self.root = None
+
   def search_node_by_name(self, opp_sequence, player_sequence):
     for i in range(max(len(opp_sequence), len(player_sequence))):
       name += player_sequence[i]
@@ -235,15 +248,15 @@ class SequenceActionTree:
   #naming scheme to walk
   #return the root of the tree
   def generate_tree(self, sb):
-    self.no_nodes = 1
+    self.no_nodes = 4
     rp_state = player_state()
     rp_state.set(0, [4,4],[2,2],[sb,sb])
     rr_state = round_state()
     rr_state.set(0, 2*sb, sb, rp_state)
-    root = Node("root", parent = None, round_state = rr_state, history_cell = None, eva = 0)
+    self.root = Node("root", parent = None, round_state = rr_state, history_cell = None, eva = 0)
 
     rp_state.set(1, [4,4],[2,2],[sb,sb])
-    opp_turn_small_blind = Node("c", parent = root, round_state = rr_state, history_cell = None, eva = 0)
+    opp_turn_small_blind = Node("c", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
 
     rp_state.set(0, [4,4],[2,1],[sb,2*sb])
     rr_state.set(0, 3*sb, sb, rp_state)
@@ -251,7 +264,7 @@ class SequenceActionTree:
 
     rp_state.set(1, [4,4],[1,2],[2*sb,sb])
     rr_state.set(0, 3*sb, sb, rp_state)
-    big_blind = Node("r", parent = root, round_state = rr_state, history_cell = None, eva = 0)
+    big_blind = Node("r", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
     action = ["f", "c", "r"]
     player = 0
 
@@ -264,7 +277,6 @@ class SequenceActionTree:
       #update player
       player = (parent.round_state.player_state.player_no + 1)%2 #switch player
 
-      
       for i in range(3):
         #update this game state from parent then create new node if possible
         r_state = parent.round_state
@@ -325,7 +337,6 @@ class SequenceActionTree:
         
         if history_cell_flag == 1:
           history_cell = HistoryCell()
-          history_cell.__init__()  
         else:
           history_cell = None
         #add new player state to round state

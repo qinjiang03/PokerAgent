@@ -2,8 +2,7 @@ import logging
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 import itertools
-
-
+import csv
 
 def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
   # =========================================== #
@@ -20,13 +19,21 @@ def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
   else:                       payout = -potAmt
   return payout
 
+def getHandStrength(holeCards, commCards):
+  holeCards = [Card.from_str(card) for card in holeCards]
+  commCards = [Card.from_str(card) for card in commCards]
+  score = HandEvaluator.eval_hand(holeCards, commCards)
+  return score
+
+def getMaxHandStrength():
+  holeCards = ['SA','SK']
+  commCards = ['SQ','SJ','ST','S9','S7']
+  score = getHandStrength(holeCards, commCards)
+  return score
 
 def evaluationFunc(holeCards, commCards, oppCards, potAmt):
   payout = 0
   return payout
-
-
-
 
 def evaluateHand(holeCards, commCards, oppCards, potAmt, depth):
   if len(oppCards) == 2:
@@ -36,8 +43,6 @@ def evaluateHand(holeCards, commCards, oppCards, potAmt, depth):
   else:
     payout = chanceNode(holeCards, commCards, oppCards, potAmt, depth-1)
   return payout
-
-
 
 def getNewDeck():
   suits = ['D','C','H','S']
@@ -78,6 +83,39 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
   expectedPayout = sum(payouts) / len(payouts)
   return expectedPayout
 
+
+
+def mapCardsToKey(holeCards, commCards):
+  SUITS = ['D','C','H','S']
+  VALUES = ['A','K','Q','J','T'] + [str(i) for i in range(9,1,-1)]
+  suitCount = [sum(card[0] == suit for card in holeCards) + sum(card[0] == suit for card in commCards) for suit in SUITS]
+  valueCount = [sum(card[1] == value for card in holeCards) + sum(card[1] == value for card in commCards) for value in VALUES]
+  
+  suitCount.sort(reverse=True)
+  suitKey = "".join([str(i) for i in suitCount])
+  valueKey = "".join([str(value) * valueCount[i] for i,value in enumerate(VALUES) if valueCount[i] != 0])
+  key = suitKey + "_" + valueKey
+  return key
+
+def lookupProb_ori(holeCards):
+  # =========================================== #
+  # Read data as dict (from NatesHoldem)
+  # =========================================== #
+  filename = "custom/preflopProb.csv"
+  with open(filename,'r') as file:
+      reader = csv.reader(file)
+      table = {rows[0]:rows[1] for rows in reader}
+  
+  hand = "".join([card[1] for card in holeCards])
+  if holeCards[0][0] == holeCards[1][0]:    hand += "s"
+  elif holeCards[0][1] != holeCards[1][1]:  hand += "o"
+  try:
+      prob = float(table[hand])
+  except KeyError:
+      hand = hand[1] + hand[0] + hand[2:]
+      prob = float(table[hand])
+  return prob
+  
 
 
 
