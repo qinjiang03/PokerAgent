@@ -45,12 +45,13 @@ class NovicePlayer(BasePokerPlayer):
     return action  # action returned here is sent to the poker engine
 
   def receive_game_start_message(self, game_info):
-    pass
+    #get current configuration of small/big blind
 
-  #get current hold card
+  
   def receive_round_start_message(self, round_count, hole_card, seats):
+    #get current hold card
     self.hole_card = hole_card
-
+    
   def receive_street_start_message(self, street, round_state):
     pass
 
@@ -159,7 +160,7 @@ class PlayerUtil:
   def effective_hand_strength(hole_cards, comm_cards):
     HS = hand_strength(hole_cards, comm_cards)
     PosP = positive_potential(hole_cards, comm_cards)
-    return (HS + (1 - HS)*PosP)
+    return  HS + (1 - HS)*PosP
 
   @staticmethod  
   def calculate_mean(data):
@@ -215,7 +216,6 @@ class HistoryCell:
 #library provide iterate and search that need to update eva
 #to know which action, take last letter from name
 #turn end == need a history cell
-
 #set name same to the sequence of action that lead to this point
 #the tree expand given this agent as the root or player 0
 #To make the tree become symmetric for action, we start with the same money and number of raise
@@ -228,6 +228,7 @@ class SequenceActionTree:
       name += opp_sequence[i]
     return anytree.search.find_by_attr(self.root, name, name = 'name')
 
+  #need to test this method 
   def return_all_node_in_current_street(self, current_node, current_street):
     return anytree.search.findall_by_attr(current_node, current_street, name = 'round_state["player_state"]["player_no"]')
 
@@ -244,11 +245,11 @@ class SequenceActionTree:
     rp_state.set(1, [4,4],[2,2],[sb,sb])
     opp_turn_small_blind = Node("c", parent = root, round_state = rr_state, history_cell = None, eva = 0)
 
-    rp_state.set(0, [4,3],[2,1],[sb,2*sb])
+    rp_state.set(0, [4,4],[2,1],[sb,2*sb])
     rr_state.set(0, 3*sb, sb, rp_state)
     small_blind = Node("cr", parent = opp_turn_small_blind, round_state = rr_state, history_cell = None, eva = 0)
 
-    rp_state.set(1, [3,4],[1,2],[2*sb,sb])
+    rp_state.set(1, [4,4],[1,2],[2*sb,sb])
     rr_state.set(0, 3*sb, sb, rp_state)
     big_blind = Node("r", parent = root, round_state = rr_state, history_cell = None, eva = 0)
     action = ["f", "c", "r"]
