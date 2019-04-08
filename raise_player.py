@@ -1,14 +1,15 @@
 from pypokerengine.players import BasePokerPlayer
 from time import sleep
 import pprint
+from pypokerengine.engine.poker_constants import PokerConstants as Const
 
 class RaisedPlayer(BasePokerPlayer):
 
-  def declare_action(self, valid_actions, hole_card, round_state):
+  def declare_action(self, valid_actions, hole_card, round_state):  
     for i in valid_actions:
-        if i["action"] == "raise":
-            action = i["action"]
-            return action  # action returned here is sent to the poker engine
+      if i["action"] == "raise":
+        action = i["action"]
+        return action
     action = valid_actions[1]["action"]
     return action # action returned here is sent to the poker engine
 

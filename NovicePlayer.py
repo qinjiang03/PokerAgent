@@ -1,11 +1,10 @@
-#author: Ho Phi Long - CS3243 Poker Agent
 #This is a poker agent that try to model opponent strategy and counter it
 
 from pypokerengine.players import BasePokerPlayer
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 from pypokerengine.engine.poker_constants import PokerConstants as Const
-from anytree import AnyNode, Walker
+from anytree import Node, Walker
 
 import queue
 import random as rand
@@ -13,19 +12,20 @@ import pprint
 import numpy
 
 class NovicePlayer(BasePokerPlayer):
-  
   def __init__(self):
     #for call and raise only, since you cannot observe opponent hand when his fold
+    #action_range = [low, high, probability within k*standard_deviation, k = sqrt(standard_deviation)]
     self.action_range = [[0, 0],[0, 0]]
     #to observe the action perform in that sequence given the believe EHS at that current state (got opponent hand from showdown, do the same as our hand)
     #assume opponent action depend on his current observance of his own EHS
     #opponent must be consistent at least within 30 - 50 rounds
     self.raiseEHS = list()
     self.callEHS = list()
-    self.current_round_player_action_history = list()
+    self.current_round_player_action_history = list() #list of 4 lists for each round
     self.current_round_opp_action_history = list()
     self.action_tree = SequenceActionTree()
     self.action_tree.generate_tree(20)
+    self.hole_card = None
 
   def declare_action(self, valid_actions, hole_card, round_state):
     # valid_actions format => [raise_action_pp = pprint.PrettyPrinter(indent=2)
@@ -47,23 +47,29 @@ class NovicePlayer(BasePokerPlayer):
   def receive_game_start_message(self, game_info):
     pass
 
+  #get current hold card
   def receive_round_start_message(self, round_count, hole_card, seats):
-    pass
+    self.hole_card = hole_card
 
   def receive_street_start_message(self, street, round_state):
     pass
 
   def receive_game_update_message(self, action, round_state):
-    pass
+    #add to history here
 
   def receive_round_result_message(self, winners, hand_info, round_state):
-    print self.action_tree.no_nodes
+    #get opp card from here
+    #opp_cards = hand_info
+    opp_card = self.hole_card
+    update_after_showdown(opp_cards, comm_cards_river)
     
-  def update_after_showdown(self, opp_cards, comm_cards_street_1, comm_cards_street_2, comm_cards_river):
-    pass
-
+  def update_after_showdown(self, opp_card, comm_cards_river):
+    EHS_opp = PlayerUtil.hand_strength(opp_card, comm_cards_river)
+    SequenceActionTree.c
+    SequenceActionTree.search_node_by_name()
+    EHS_opp
+    
   def setup_ai():
-
     return NovicePlayer()
 
 class PlayerUtil:
@@ -137,8 +143,8 @@ class PlayerUtil:
       HPTotal[index] += 1
 
       for p_board_card in possible_board_cards:
-        ourbest = HandEvaluator.eval_hand(hole_cards, comm_cards + list(p_board_card))
-        oppbest = HandEvaluator.eval_hand(opp_cards, comm_cards + list(p_board_card))
+        ourbest = HandEvaluator.eval_hand(hole_cards, comm_cards + p_board_card)
+        oppbest = HandEvaluator.eval_hand(opp_cards, comm_cards + p_board_card)
         if ourbest > oppbest:
             HP[index][ahead] += 1
         elif ourbest == oppbest:
@@ -153,7 +159,7 @@ class PlayerUtil:
   def effective_hand_strength(hole_cards, comm_cards):
     HS = hand_strength(hole_cards, comm_cards)
     PosP = positive_potential(hole_cards, comm_cards)
-    return round((HS + (1 - HS)*PosP), 1)
+    return (HS + (1 - HS)*PosP)
 
   @staticmethod  
   def calculate_mean(data):
@@ -162,13 +168,15 @@ class PlayerUtil:
   @staticmethod 
   def calculate_var(data):
     return numpy.var(data)
-  
+
   @staticmethod
-  def calculate_standard_deviation(data):
-    return numpy.std(data)
+  def calculate_range(mean, var):
+    return [int(mean - var), int(mean + var)]  
+  # @staticmethod
+  # def calculate_standard_deviation(data):
+  #   return numpy.std(data)
 
 class HistoryCell:
-
   def __init__(self):
     self.EHS_frequency_cell = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     self.total_data_point = 0
@@ -200,44 +208,60 @@ class HistoryCell:
     return [1 - callPr - raisePr, callPr, raisePr]
 
 #Some attribute only insert/define when necessary
-#this tree only need to follow simple rule
+#this tree only need to follow normal rule and with these restriction
 #1. each player have max 4 number of raise
-#2. value equal is end turn
-#3. fold is end turn
-#4. 2 max raise in a turn
+#2. 2 max raise in a turn
+#3. big blind is counted as 1 raise
 #library provide iterate and search that need to update eva
 #to know which action, take last letter from name
 #turn end == need a history cell
-class SequenceActionTree: 
-  #set name same to the sequence of action that lead to this point
-  #the tree expand given this agent as the root or player 0
-  
 
+#set name same to the sequence of action that lead to this point
+#the tree expand given this agent as the root or player 0
+#To make the tree become symmetric for action, we start with the same money and number of raise
+  #if we are small blind, first action is call, and opp first action is raise
+  #if we are big blind, first action is raise, then act normally
+class SequenceActionTree: 
   def search_node_by_name(self, opp_sequence, player_sequence):
     for i in range(max(len(opp_sequence), len(player_sequence))):
       name += player_sequence[i]
       name += opp_sequence[i]
-    return find_by_attr(self.root, name = name)
+    return anytree.search.find_by_attr(self.root, name, name = 'name')
+
+  def return_all_node_in_current_street(self, current_node, current_street):
+    return anytree.search.findall_by_attr(current_node, current_street, name = 'round_state["player_state"]["player_no"]')
 
   #naming scheme to walk
+  #return the root of the tree
   def generate_tree(self, sb):
     self.no_nodes = 1
     rp_state = player_state()
-    rp_state.set(0, [4,4],[2,1],[1*sb,2*sb])
+    rp_state.set(0, [4,4],[2,2],[sb,sb])
     rr_state = round_state()
+    rr_state.set(0, 2*sb, sb, rp_state)
+    root = Node("root", parent = None, round_state = rr_state, history_cell = None, eva = 0)
+
+    rp_state.set(1, [4,4],[2,2],[sb,sb])
+    opp_turn_small_blind = Node("c", parent = root, round_state = rr_state, history_cell = None, eva = 0)
+
+    rp_state.set(0, [4,3],[2,1],[sb,2*sb])
     rr_state.set(0, 3*sb, sb, rp_state)
-    root = AnyNode(name = "", parent = None, round_state = rr_state, history_cell = None, eva = 0)
+    small_blind = Node("cr", parent = opp_turn_small_blind, round_state = rr_state, history_cell = None, eva = 0)
+
+    rp_state.set(1, [3,4],[1,2],[2*sb,sb])
+    rr_state.set(0, 3*sb, sb, rp_state)
+    big_blind = Node("r", parent = root, round_state = rr_state, history_cell = None, eva = 0)
     action = ["f", "c", "r"]
     player = 0
 
     #parent queue
     p_queue = queue.Queue()
-    p_queue.put(root)
+    p_queue.put(small_blind, big_blind)
 
     while ~p_queue.empty():
       parent = p_queue.get()
       #update player
-      player = (player + 1)%2
+      player = (parent.round_state.player_state.player_no + 1)%2 #switch player
 
       
       for i in range(3):
@@ -259,21 +283,24 @@ class SequenceActionTree:
             r_state.pot = p_state.no_raise[player]*2
             #end the round
             r_state.current_street += 1
+            p_state.player_no = 0
             history_cell_flag = 1
 
-          #to check if the call will not result in another call but end that turn
-          #will create the same node with different player_no but the same round state if it not end the turn 
+          #to check if the call can not result in another call but end that turn
+          #will create the same node with different player_no bzut the same round state if it not end the turn 
           #check parent of parent, if parent of parent current street is smaller then end the turn
           else: 
             if parent.parent.round_state.current_street < parent.round_state.current_street:
               r_state.current_street += 1
+              p_state.player_no = 0
               history_cell_flag = 1
             
 
         #can only raise 2 times in 1 turn and 
         elif action[i] == "r":
+          #if player can raise
           if p_state.no_raise[player] > 0:   
-            #if the turn still allow him to raise
+            #if the turn still allow player to raise
             if p_state.no_turn_raise[player] > 0:
               if r_state.current_street == 3:
                 p_state.no_bet[player] = p_state.no_bet[1-player] + 2*sb
@@ -291,6 +318,7 @@ class SequenceActionTree:
             r_state.pot = p_state.no_raise[player]*2
             #end the round and refill number of raise in that turn
             r_state.current_street += 1
+            p_state.player_no = 0
             p_state.no_turn_raise[player] = 2
             history_cell_flag = 1
         
@@ -302,7 +330,7 @@ class SequenceActionTree:
         #add new player state to round state
         r_state.player_state = p_state
 
-        node = AnyNode(name = name, parent = parent, round_state = round_state, history_cell = history_cell, eva = eva)
+        node = Node(name = name, parent = parent, round_state = round_state, history_cell = history_cell, eva = eva)
         self.no_nodes += 1
         
         #only add new node as parent if that node have round_street state before RIVER
@@ -311,16 +339,28 @@ class SequenceActionTree:
     return root 
 
 class round_state:
-  def set(self, current_street, pot, sb, player_state):
+  def __init__(self):
+    self.current_street = None
+    self.pot = None
+    self.sb = None
+    self.player_state = player_state()
+
+  def set(self, current_street, pot, sb, player_states):
     self.current_street = current_street
     self.pot = pot
     self.sb = sb
-    self.player_state = player_state
+    self.player_state = player_states
 
 class player_state:
+  def __init__(self):
+    self.player_no = None
+    self.no_raise = None
+    self.no_turn_raise = None
+    self.no_bet = None
+
   def set(self, player_no, no_raise, no_turn_raise, no_bet):
     self.player_no = player_no
     self.no_raise = no_raise
-    #this value can only be reset if current street value increase
+    #this value should only be reseted if current street value increase
     self.no_turn_raise = no_turn_raise
     self.no_bet = no_bet

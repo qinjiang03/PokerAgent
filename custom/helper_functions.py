@@ -21,8 +21,6 @@ def evaluateShowdown(holeCards, commCards, oppCards, potAmt):
   return payout
 
 
-
-
 def evaluationFunc(holeCards, commCards, oppCards, potAmt):
   payout = 0
   return payout
