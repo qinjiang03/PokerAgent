@@ -29,14 +29,15 @@ import itertools
 # results = []
 # for w in w_list:
 config = setup_config(max_round=100, initial_stack=10000, small_blind_amount=10)
-# config.register_player(name="RaisePlayer", algorithm=RaisedPlayer())
+config.register_player(name="RaisePlayer", algorithm=RaisedPlayer())
 # config.register_player(name="CallPlayer", algorithm=CallPlayer())
-config.register_player(name="HonestPlayer1", algorithm=HonestPlayer())
-config.register_player(name="HonestPlayer2", algorithm=HonestPlayer2())
+# config.register_player(name="HonestPlayer1", algorithm=HonestPlayer())
+config.register_player(name="HonestPlayer2", algorithm=HonestPlayer())
 # config.register_player(name="MiniMaxPlayer", algorithm=MiniMaxPlayer())
 # config.register_player(name="HonestPlayer2", algorithm=HonestPlayer2(w[0], w[1], w[2]))
 
-game_result = start_poker(config, verbose=1)
+game_result = start_poker(config, verbose=0)
+print(game_result)
 
 #     result = list(w) + [player["stack"] for player in game_result["players"]]
 #     logging.info(result)   

@@ -109,8 +109,31 @@ def monteCarloSimulation(file, nSims):
 
 
 
+def getScore(holeCards, commCards):
+    # =========================================== #
+    # Using PyPokerEngine's HandEvaluator
+    # =========================================== #
+    if not isinstance(holeCards, list): holeCards = literal_eval(holeCards)
+    if not isinstance(commCards, list): commCards = literal_eval(commCards)
+    holeCards = [Card.from_str(card) for card in holeCards]
+    commCards = [Card.from_str(card) for card in commCards]
+
+    myScore = HandEvaluator.eval_hand(holeCards, commCards)
+    return myScore
+
+
+def getScores(file):
+    df = pd.read_csv(file)
+    df["Hand Strength"] = [getScore(df["holeCards"].iloc[i], df["commCards"].iloc[i]) for i in range(df.shape[0])]
+    df.to_csv("prob3.csv", index=False)
+    return
+
+
+
 
 if __name__ == "__main__":
     # genUniqCombins2(4)
     
-    monteCarloSimulation(file="flopCombins_n3.csv", nSims=1000)
+    # monteCarloSimulation(file="flopCombins_n3.csv", nSims=1000)
+
+    getScores(file="prob2.csv")
