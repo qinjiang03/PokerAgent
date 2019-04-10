@@ -277,6 +277,8 @@ class LearningPlayer(BasePokerPlayer):
         pass
 
     def receive_round_start_message(self, round_count, hole_card, seats):
+        # Store hole card for end of round
+        self.hole_card = hole_card
         # Reset agent
         if self.training:
             self.prev_feat_vector = None
@@ -303,8 +305,7 @@ class LearningPlayer(BasePokerPlayer):
         ############
 
         # Get hole card
-        player_info = list(filter(lambda x: x['uuid'] == self.uuid, hand_info))[0]
-        hole_card = player_info['hand']['card']
+        hole_card = self.hole_card
 
         # Do a final training step for the episode
         feat_vector = self._gen_feat_vector(hole_card, round_state)
