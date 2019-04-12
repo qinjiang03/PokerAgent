@@ -5,6 +5,7 @@ from pypokerengine.engine.card import Card
 from lib.net import DQN
 from lib.buffer import ExperienceBuffer
 
+import csv
 import time
 import random
 import torch
@@ -24,14 +25,22 @@ Experience = collections.namedtuple('Experience',
 
 class LearningPlayer(BasePokerPlayer):
 
-    def __init__(self, training=False):
+    def __init__(self, training=False, model_path='model.dat', stats_path='stats.csv'):
+        self.numGames = 0
+        self.numFolds_opp = 0
+        self.numActions_opp = 0
+        self.numCalls_opp = 0
+        self.numRaises_opp = 0
+
         # Flag to indicate whether our agent is in training mode
         self.training = training
+        self.MODEL_PATH = model_path
+        self.STATS_PATH = stats_path
         # Initialize our neural net
-        self.N_FEAT = 17
-        self.N_HIDDEN = 20
+        self.N_FEAT = 19
         self.N_ACTIONS = 3
-        self.N_LAYERS = 2
+        self.N_HIDDEN = (self.N_FEAT + self.N_ACTIONS) / 2
+        self.N_LAYERS = 1
         self.net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
         # Counter of frames
         self.frame_i = 0
@@ -43,17 +52,17 @@ class LearningPlayer(BasePokerPlayer):
             # Batch size sampled from the replay buffer
             self.BATCH = 32
             # Maximum capacity of the buffer
-            self.REPLAY_SIZE = 10**4
+            self.REPLAY_SIZE = 10**2
             # Count of frames to wait for before starting training to
             # populate the replay buffer
-            self.REPLAY_START_SIZE = 10**4
+            self.REPLAY_START_SIZE = 10**2
             self.LEARNING_RATE = 1e-4
             # How frequently we sync model weights from the training model
             # to the target model, which is used to get the next state in
             # the Bellman approximation
-            self.SYNC_TARGET_FRAMES = 10**3
+            self.SYNC_TARGET_FRAMES = 10**1
 
-            self.EPSILON_DECAY_LAST_FRAME = 10**5
+            self.EPSILON_DECAY_LAST_FRAME = 10**3
             self.EPSILON_START = 1.0
             self.EPSILON_FINAL = 0.02
 
@@ -197,10 +206,8 @@ class LearningPlayer(BasePokerPlayer):
         self.optimizer.step()
 
     def _gen_feat_vector(self, hole_card, round_state):
-        """Returns a list of 17 numerical features.
-        """
         MAX_HAND_STR = 8429805.0
-        STREET_NUM = {"preflop": 1, "flop": 2, "turn": 3, "river": 4}
+        STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4}
 
         potAmt = round_state["pot"]["main"]["amount"]
         stacks = [seat["stack"] for seat in round_state["seats"]]
@@ -210,25 +217,29 @@ class LearningPlayer(BasePokerPlayer):
         stackFracs = [stack * 1.0 / TOTAL_STACK for stack in stacks]
 
         handStr = [self._get_hand_strength(hole_card, round_state["community_card"]) / MAX_HAND_STR]
-        streetNum = [value for street, value in STREET_NUM.items() if round_state["street"] == street]
+        streetNum = [num for street, num in STREETS.items() if round_state["street"] == street]
         isSmallBlind = [1] if round_state["next_player"] == round_state["small_blind_pos"] else [0]
         numRaiseSelf = [sum(1 if history["action"] == "RAISE" and history["uuid"] == self.uuid else 0 \
                         for history in round_state["action_histories"][street]) / 4.0 \
                         if street in round_state["action_histories"] else 0 \
-                        for street in ["preflop", "flop", "turn", "river"]]
+                        for street in STREETS.keys()]
         numRaiseOpp = [sum(1 if history["action"] == "RAISE" and history["uuid"] != self.uuid else 0 \
                         for history in round_state["action_histories"][street]) / 4.0 \
                         if street in round_state["action_histories"] else 0 \
-                        for street in ["preflop", "flop", "turn", "river"]]
+                        for street in STREETS.keys()]
         totalRaiseSelf = [sum(numRaiseSelf)]
         totalRaiseOpp = [sum(numRaiseOpp)]
 
+        histFoldOpp = [self.numFolds_opp * 1.0 / self.numGames] if self.numGames != 0 else [0.0]
+        histCallOpp = [self.numCalls_opp * 1.0 / self.numActions_opp] if self.numActions_opp != 0 else [0.0]
+        histRaiseOpp = [self.numRaises_opp * 1.0 / self.numActions_opp] if self.numActions_opp != 0 else [0.0]
+
         features = handStr + streetNum + isSmallBlind \
           + numRaiseSelf + numRaiseOpp + totalRaiseSelf + totalRaiseOpp \
-          + potFrac + stackFracs
+          + potFrac + stackFracs \
+          + histFoldOpp + histCallOpp + histRaiseOpp
 
         return features
-
 
 
     ##################
@@ -274,7 +285,10 @@ class LearningPlayer(BasePokerPlayer):
 
 
     def receive_game_start_message(self, game_info):
-        pass
+        # Track time taken
+        self.ts = time.time()
+        # Store the stack amount
+        self.TOTAL_STACK = game_info['rule']['initial_stack']*2
 
     def receive_round_start_message(self, round_count, hole_card, seats):
         # Store hole card for end of round
@@ -284,13 +298,15 @@ class LearningPlayer(BasePokerPlayer):
             self.prev_feat_vector = None
             self.prev_action = None
 
-        # Track time taken for each episode/round
-        self.ts = time.time()
-
     def receive_street_start_message(self, street, round_state):
         pass
 
     def receive_game_update_message(self, action, round_state):
+        if action["player_uuid"] != self.uuid:
+            self.numActions_opp += 1
+            if action["action"] == "fold":    self.numFolds_opp += 1
+            elif action["action"] == "call":  self.numCalls_opp += 1
+            elif action["action"] == "raise": self.numRaises_opp += 1
         pass
 
     def receive_round_result_message(self, winners, hand_info, round_state):
@@ -325,6 +341,9 @@ class LearningPlayer(BasePokerPlayer):
         reward = round_state['pot']['main']['amount']
         if not won:
             reward = -reward
+        # Get current stack
+        winner_stack = winners[0]['stack']
+        stack = winner_stack if won else self.TOTAL_STACK - winner_stack
 
         self.total_rewards.append(reward)
         # Calculate mean reward
@@ -337,15 +356,30 @@ class LearningPlayer(BasePokerPlayer):
               (self.frame_i, len(self.total_rewards), mean_reward,
                self._epsilon(), time_taken))
 
+        ##############################
+        # MODEL AND STATS SAVED HERE #
+        ##############################
+
         # Save model if best mean reward so far
         if self.training:
             if self.best_mean_reward is None or \
                self.best_mean_reward < mean_reward:
 
-                torch.save(self.net.state_dict(), 'model.dat')
+                torch.save(self.net.state_dict(), self.MODEL_PATH)
                 if self.best_mean_reward is not None:
                     print("Best mean reward updated %.3f -> %.3f, model saved" % (self.best_mean_reward, mean_reward))
                 self.best_mean_reward = mean_reward
+
+            # Save statistics
+            # - frame_i
+            # - epsilon
+            # - mean_reward
+            # - reward
+            # - stack
+            with open(self.STATS_PATH, mode='w') as stats:
+                stats_writer = csv.writer(stats, delimiter=',')
+                stats_writer.writerow([self.frame_i, self._epsilon(),
+                                       mean_reward, reward, stack])
 
 
 
