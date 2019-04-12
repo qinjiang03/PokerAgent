@@ -326,7 +326,7 @@ class LearningPlayer(BasePokerPlayer):
         # Do a final training step for the episode
         feat_vector = self._gen_feat_vector(hole_card, round_state)
 
-        if self.training:
+        if self.training and not self.prev_feat_vector is None:
             # Store the current transition in the buffer
             self._store_buffer(feat_vector)
             self._train_step()
