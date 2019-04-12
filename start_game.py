@@ -22,9 +22,12 @@ import os
 #logger = startLogging(logFile)
 
 #TODO:config the config as our wish
-config = setup_config(max_round=1, initial_stack=3000, small_blind_amount=20)
+config = setup_config(max_round=1, initial_stack=3000, small_blind_amount=10)
+
 
 #config.register_player(name="NoviceOpponentModelPlayer", algorithm=NovicePlayer())
-config.register_player(name="RaisedPlayer1", algorithm=RaisedPlayer())
-config.register_player(name="RaisedPlayer2", algorithm=RaisedePlayer())
+config.register_player(name="NovicePlayer", algorithm=NovicePlayer())
+config.register_player(name="RaisedPlayer", algorithm=RaisedPlayer())
 
+
+game_result = start_poker(config, verbose=1)

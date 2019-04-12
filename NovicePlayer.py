@@ -4,12 +4,14 @@ from pypokerengine.players import BasePokerPlayer
 from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 from pypokerengine.engine.poker_constants import PokerConstants as Const
-from anytree import Node, Walker
-
+from anytree import Node, Walker, RenderTree, ContStyle, search
+from custom import helper_functions
 import queue
 import random as rand
 import pprint
 import numpy
+import itertools
+import copy
 
 class NovicePlayer(BasePokerPlayer):
   def __init__(self):
@@ -22,71 +24,61 @@ class NovicePlayer(BasePokerPlayer):
     self.raiseEHS = list()
     self.callEHS = list()
 
-    self.current_round_player_action_history = list(list(), list(), list(), list()) #list of 4 lists for each round
-    self.current_round_opp_action_history = list(list(), list(), list(), list())
+    self.opp_action = list() #list of 4 lists for each round
+    self.player_action = list()
     
     self.action_tree = SequenceActionTree()
     self.action_tree.generate_tree(20)
     self.hole_card = None
 
+    print self.action_tree.no_nodes
+    #print(self.action_tree.search_node_by_name("rrrrc "))
+    #print(RenderTree(self.action_tree.root, style=ContStyle()).by_attr("name"))
+    # for row in RenderTree(self.action_tree.root, style=ContStyle()):
+    #   print(row.node.name)
+    #   row.node.round_state.print_round()
+    #   row.node.round_state.player_state.print_player()
+    #   print(" ")
+    
   def declare_action(self, valid_actions, hole_card, round_state):
-    current_street = action_histories['street']
-    c_street = 0
-    if current_street == 'preflop'
-      c_street = 0
-    elif current_street == 'flop'
-      c_street = 1
-    elif current_street == 'turn'
-      c_street = 2
-    elif current_street == 'river'
-      c_street = 3
-
-    s = size(round_state.action_histories[current_street])
-    current_round_opp_action_history[c_street].append(round_state.action_histories[s - 1])
-
+    #print(round_state)
+    # current_round_player_action_history[c_street].append(round_state.action_histories[s - 2]) 
+    # current_round_opp_action_history[c_street].append(round_state.action_histories[s - 1])
     action = "fold"
     for i in valid_actions:
-        if i["action"] == "call":
-          action = i["action"]
-          return action 
+      if i["action"] == "call":
+        action = i["action"]
+        return action 
+    action = valid_actions[1]["action"]
+    print(round_state)
     return action  # action returned here is sent to the poker engine
 
   def receive_game_start_message(self, game_info):
-    #get current configuration of small/big blind
-
+    pass
   
   def receive_round_start_message(self, round_count, hole_card, seats):
     self.hole_card = hole_card
+    print(seats)
     
   def receive_street_start_message(self, street, round_state):
     pass
 
   def receive_game_update_message(self, action, round_state):
     #add to history here
+    pass
 
   def receive_round_result_message(self, winners, hand_info, round_state):
     #get opp card from here
-    opp_card = hand_info['hand']['card']
-    update_after_showdown(opp_card, comm_cards_river)
-    
-  def update_after_showdown(self, opp_card, comm_cards_river):
-    EHS_opp = PlayerUtil.hand_strength(opp_card, comm_cards_river)
-    SequenceActionTree.search_node_by_name()
+    for i in hand_info:
+      if i['hand']['card'] != self.hole_card:
+        opp_card = i['hand']['card']
+        EHS_opp = PlayerUtil.hand_strength(opp_card, round_state['community_card'])
 
-    EHS_opp = PlayerUtil.effective_hand_strength(opp_card, comm_cards_river - comm_cards_river[size(comm_cards_river) - 1])
-    SequenceActionTree.search_node_by_name()
-    
-    EHS_opp = PlayerUtil.effective_hand_strength(opp_card, comm_cards_river - comm_cards_river[size(comm_cards_river) - 1])
-    SequenceActionTree.search_node_by_name()
     
   def setup_ai():
     return NovicePlayer()
 
 class PlayerUtil:
-  @staticmethod
-  def set_up():
-    self.alway_full_deck = getNewDeck()
-
   @staticmethod
   def getNewDeck():
     suits = ['D','C','H','S']
@@ -106,14 +98,18 @@ class PlayerUtil:
 
   @staticmethod  
   #Caculate immediate win rate against opponent
-  def hand_strength(hole_cards, comm_cards):
-    ourrank = HandEvaluator.eval_hand(holeCards, comm_cards)
+  def hand_strength(hole_cards, comm_cards): 
+    deck = PlayerUtil.reduceDeck(PlayerUtil.getNewDeck(), comm_cards)
+    deck = PlayerUtil.reduceDeck(deck, hole_cards)
+    oppPossbileCards = PlayerUtil.getAllCombins(deck, 2)
+
+    hole_cards = [Card.from_str(card) for card in hole_cards]
+    comm_cards = [Card.from_str(card) for card in comm_cards]
+    ourrank = HandEvaluator.eval_hand(hole_cards, comm_cards)
     ahead = tied = behind = 0
-    deck = reduceDeck(self.alway_full_deck, comm_cards)
-    deck = reduceDeck(deck, hole_cards)
-    oppPossbileCards = getAllCombins(deck, 2)
-    
+  
     for opp_cards in oppPossbileCards:
+      opp_cards = [Card.from_str(card) for card in opp_cards]
       opprank = HandEvaluator.eval_hand(opp_cards, comm_cards)
       if ourrank > opprank:
           ahead += 1
@@ -128,7 +124,7 @@ class PlayerUtil:
     HP = [(0,0),(0,0),(0,0)]
     HPTotal = [0, 0, 0]
     ourrank = HandEvaluator.eval_hand(hole_cards, comm_cards)
-    deck = reduceDeck(self.always_full_deck, comm_cards)
+    deck = reduceDeck(PlayerUtil.getNewDeck(), comm_cards)
     deck = reduceDeck(deck, hole_cards)
     oppPossbileCards = getAllCombins(deck, 2)     
     if len(comm_cards) == 3:   
@@ -190,6 +186,7 @@ class HistoryCell:
   def __init__(self):
     self.EHS_frequency_cell = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     self.total_data_point = 0
+    self.min_data_points = 10
 
   #update the frequency
   def update_action_frequency_cell(self, hole_cards, comm_cards):
@@ -217,158 +214,191 @@ class HistoryCell:
 
     return [1 - callPr - raisePr, callPr, raisePr]
 
-#Some attribute only insert/define when necessary
-#this tree only need to follow normal rule and with these restriction
+#This tree only need to follow normal rule and with these restriction
 #1. each player have max 4 number of raise
 #2. 2 max raise in a turn
 #3. big blind is counted as 1 raise
-#library provide iterate and search that need to update eva
-#to know which action, take last letter from name
-#turn end == need a history cell
 #set name same to the sequence of action that lead to this point
 #the tree expand given this agent as the root or player 0
-#To make the tree become symmetric for action, we start with the same money and number of raise
-  #if we are small blind, first action is call, and opp first action is raise
-  #if we are big blind, first action is raise, then act normally
+#if we are small blind, first action is call, and opp first action is raise
+#if we are big blind, first action is raise, then act normally
 class SequenceActionTree: 
   def __init__(self):
     self.no_nodes = 0
     self.root = None
 
-  def search_node_by_name(self, opp_sequence, player_sequence):
-    for i in range(max(len(opp_sequence), len(player_sequence))):
-      name += player_sequence[i]
-      name += opp_sequence[i]
-    return anytree.search.find_by_attr(self.root, name, name = 'name')
+  #to search for current position
+  def search_node_by_name(self, name):
+    return search.find_by_attr(self.root, name, name = 'name')
 
-  #need to test this method 
+  #To search for all node in the same street from current position
   def return_all_node_in_current_street(self, current_node, current_street):
-    return anytree.search.findall_by_attr(current_node, current_street, name = 'round_state["player_state"]["player_no"]')
+    return search.findall_by_attr(current_node, current_street, name = 'round_state["player_state"]["player_no"]')
 
-  #naming scheme to walk
+  #To check if the cut_off node have enough data point to use
+  #return false if anynode in the subtree need to search don't have enough data points to use for calculation
+  def check_opp_model_availability(self, node_list):
+    for i in node_list:
+      if i.history_cell.total_data_point < i.history_cell.min_data_points:
+        return False    
+    return True 
+
   #return the root of the tree
   def generate_tree(self, sb):
-    self.no_nodes = 4
-    rp_state = player_state()
+    self.no_nodes = 3
+    max_street = Const.Street.RIVER
+    rr_state = RoundState()
+    rp_state = PlayerState()
     rp_state.set(0, [4,4],[2,2],[sb,sb])
-    rr_state = round_state()
     rr_state.set(0, 2*sb, sb, rp_state)
-    self.root = Node("root", parent = None, round_state = rr_state, history_cell = None, eva = 0)
+    self.root = Node(name = "root", parent = None, round_state = rr_state, history_cell = None, eva = 0)
 
-    rp_state.set(1, [4,4],[2,2],[sb,sb])
-    opp_turn_small_blind = Node("c", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
-
+    rr_state = RoundState()
+    rp_state = PlayerState()
     rp_state.set(0, [4,4],[2,1],[sb,2*sb])
     rr_state.set(0, 3*sb, sb, rp_state)
-    small_blind = Node("cr", parent = opp_turn_small_blind, round_state = rr_state, history_cell = None, eva = 0)
+    small_blind = Node(name = "cr", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
 
+    rr_state = RoundState()
+    rp_state = PlayerState()
     rp_state.set(1, [4,4],[1,2],[2*sb,sb])
     rr_state.set(0, 3*sb, sb, rp_state)
-    big_blind = Node("r", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
+    big_blind = Node(name = "r", parent = self.root, round_state = rr_state, history_cell = None, eva = 0)
     action = ["f", "c", "r"]
-    player = 0
+    initialize_history_cell = HistoryCell()
 
     #parent queue
     p_queue = queue.Queue()
-    p_queue.put(small_blind, big_blind)
+    p_queue.put(small_blind)
+    p_queue.put(big_blind)
 
-    while ~p_queue.empty():
+    while p_queue.empty() == False:
       parent = p_queue.get()
-      #update player
-      player = (parent.round_state.player_state.player_no + 1)%2 #switch player
-
+      # print parent.name
+      # parent.round_state.print_round()
+      # parent.round_state.player_state.print_player()
+      
       for i in range(3):
-        #update this game state from parent then create new node if possible
-        r_state = parent.round_state
-        p_state = r_state.player_state
-        p_state.player_no = player
-        name = parent.name + action[i]
-        eva = 0
-        history_cell_flag = 0
+        #update this game state from parent then create new node if possible)
+        r_state = RoundState()
+        p_state = PlayerState()
+        #inherit value from parent
+        name = copy.deepcopy(parent.name) + action[i]
+        player = copy.deepcopy(parent.round_state.player_state.player_no)
+        history_cell = copy.deepcopy(initialize_history_cell)
+        p_state = copy.deepcopy(parent.round_state.player_state)        
+        r_state = copy.deepcopy(parent.round_state)
 
+        #eva depend on who fold
         if action[i] == "f":
-          eva = r_state.pot - p_state.no_bet[player]
+          #we fold
+          if player == 0:
+            eva = 0 - p_state.no_bet[player]
+          #opp fold
+          elif player == 1:
+            eva = r_state.pot - p_state.no_bet[player]
+          node = Node(name = name, parent = parent, round_state = r_state, history_cell = None, eva = eva)
+          self.no_nodes += 1
         
+        #any node here should go to queue
         elif action[i] == "c":
-          if p_state.no_bet[player] != p_state.no_bet[1-player]:
+          #level money and move to next turn
+          if p_state.no_bet[player] != p_state.no_bet[1-player] and len(name) > 3:
             #raise player bet and change pot
-            p_state.no_bet[player] = p_state.no_bet[1-player]
-            r_state.pot = p_state.no_raise[player]*2
-            #end the round
+            if  p_state.no_bet[player] > p_state.no_bet[1-player]:
+              p_state.no_bet[1-player] = p_state.no_bet[player]
+            else:
+              p_state.no_bet[player] = p_state.no_bet[1-player]
+            r_state.pot = p_state.no_bet[player]*2
+            if name[0] == "r":
+              player = 1
+            elif name[0] == "c":
+              player = 0
             r_state.current_street += 1
-            p_state.player_no = 0
-            history_cell_flag = 1
-
-          #to check if the call can not result in another call but end that turn
-          #will create the same node with different player_no bzut the same round state if it not end the turn 
-          #check parent of parent, if parent of parent current street is smaller then end the turn
+            name += " "
+            p_state.player_no = player
+            p_state.no_turn_raise = [2,2]
+            r_state.player_state = p_state
+            node = Node(name = name, parent = parent, round_state = r_state, history_cell = history_cell, eva = 0)
+            if r_state.current_street < (max_street + 1): 
+              p_queue.put(node)
+          #for first street first action of small blind is call, round continue    
+          elif p_state.no_bet[player] != p_state.no_bet[1-player] and len(name) <= 3:
+              p_state.player_no = (player + 1)%2            
+              r_state.player_state = p_state
+              node = Node(name = name, parent = parent, round_state = r_state, history_cell = history_cell, eva = 0) 
+              if r_state.current_street < (max_street + 1): 
+                p_queue.put(node)
+          #double call/start turn call case      
           else: 
-            if parent.parent.round_state.current_street < parent.round_state.current_street:
-              r_state.current_street += 1
-              p_state.player_no = 0
-              history_cell_flag = 1
-            
+            #if previous action is not call --> nothing change, just switch turn
+            if name[len(name) - 2] == " ":
+              p_state.player_no = (player + 1)%2            
+              r_state.player_state = p_state
+              node = Node(name = name, parent = parent, round_state = r_state, history_cell = history_cell, eva = 0) 
+              if r_state.current_street < (max_street + 1): 
+                p_queue.put(node)
 
-        #can only raise 2 times in 1 turn and 
+            #if previous action is call --> nmove to new street (2 continuous call so no value change)
+            elif name[len(name) - 2] == "c":
+              if name[0] == "r":
+                player = 1
+              elif name[0] == "c":
+                player = 0
+              r_state.current_street += 1
+              name += " "
+              p_state.player_no = player
+              p_state.no_turn_raise = [2,2]
+              r_state.player_state = p_state
+              node = Node(name = name, parent = parent, round_state = r_state, history_cell = history_cell, eva = 0)
+              if r_state.current_street < (max_street + 1): 
+                p_queue.put(node)
+
+        #can only raise 2 times in 1 turn and max 4 times
         elif action[i] == "r":
           #if player can raise
           if p_state.no_raise[player] > 0:   
-            #if the turn still allow player to raise
+            #if the turn still allow player to raise, perform action and switch turn
             if p_state.no_turn_raise[player] > 0:
-              if r_state.current_street == 3:
-                p_state.no_bet[player] = p_state.no_bet[1-player] + 2*sb
+              if r_state.current_street > 1:
+                p_state.no_bet[player] = p_state.no_bet[1-player] + 4*sb
               else:  
-                p_state.no_bet[player] = p_state.no_bet[1-player] + sb
-              r_state.pot = p_state.no_bet[player] + p_state.no_bet[1-player]
+                p_state.no_bet[player] = p_state.no_bet[1-player] + 2*sb
+              
+              r_state.pot = rp_state.no_bet[player] + rp_state.no_bet[1-player]
               p_state.no_turn_raise[player] -= 1
               p_state.no_raise[player] -= 1
+              
+              p_state.player_no = (player + 1)%2
+              r_state.player_state = p_state
+              node = Node(name = name, parent = parent, round_state = r_state, history_cell = None, eva = 0) 
+              
+              if r_state.current_street < (max_street + 1): 
+                p_queue.put(node)
+    
+class RoundState:
 
-          #when can not raise in turn, change to call action
-          else:
-            name = parent.name + action[1]
-            #raise player bet and change pot
-            p_state.no_bet[player] = p_state.no_bet[1-player]
-            r_state.pot = p_state.no_raise[player]*2
-            #end the round and refill number of raise in that turn
-            r_state.current_street += 1
-            p_state.player_no = 0
-            p_state.no_turn_raise[player] = 2
-            history_cell_flag = 1
-        
-        if history_cell_flag == 1:
-          history_cell = HistoryCell()
-        else:
-          history_cell = None
-        #add new player state to round state
-        r_state.player_state = p_state
-
-        node = Node(name = name, parent = parent, round_state = round_state, history_cell = history_cell, eva = eva)
-        self.no_nodes += 1
-        
-        #only add new node as parent if that node have round_street state before RIVER
-        if r_state.current_street < 3:
-          p_queue.put(node)
-    return root 
-
-class round_state:
   def __init__(self):
-    self.current_street = None
-    self.pot = None
-    self.sb = None
-    self.player_state = player_state()
+    self.current_street = 0
+    self.pot = 0
+    self.sb = 20
+    self.player_state = PlayerState()
 
-  def set(self, current_street, pot, sb, player_states):
+  def set(self, current_street, pot, sb, player_state):
     self.current_street = current_street
     self.pot = pot
     self.sb = sb
-    self.player_state = player_states
+    self.player_state = player_state
 
-class player_state:
+  def print_round(self):
+    print self.current_street, self.pot, self.sb
+
+class PlayerState:
   def __init__(self):
-    self.player_no = None
-    self.no_raise = None
-    self.no_turn_raise = None
-    self.no_bet = None
+    self.player_no = 0
+    self.no_raise = [4,4]
+    self.no_turn_raise =[2,2]
+    self.no_bet = [0,0]
 
   def set(self, player_no, no_raise, no_turn_raise, no_bet):
     self.player_no = player_no
@@ -376,3 +406,6 @@ class player_state:
     #this value should only be reseted if current street value increase
     self.no_turn_raise = no_turn_raise
     self.no_bet = no_bet
+
+  def print_player(self):
+    print self.player_no, self.no_raise, self.no_turn_raise, self.no_bet

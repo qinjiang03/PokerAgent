@@ -9,13 +9,13 @@ class RaisedPlayer(BasePokerPlayer):
     # print("Valid Actions : ")
     # pprint.pprint(valid_actions)
     for i in valid_actions:
-        if i["action"] == "raise":
-            action = i["action"]
-            # print("(R1)Taken Actions : ")
-            # pprint.pprint(action)
-            # action = 'raise'
-            # pprint.pprint(valid_actions)
-            return action  # action returned here is sent to the poker engine
+      if i["action"] == "raise":
+          action = i["action"]
+          # print("(R1)Taken Actions : ")
+          # pprint.pprint(action)
+          # action = 'raise'
+          # pprint.pprint(valid_actions)
+          return action  # action returned here is sent to the poker engine
 
     action = valid_actions[1]["action"]
     # print("(R2)Taken Actions : ")
@@ -40,11 +40,7 @@ class RaisedPlayer(BasePokerPlayer):
     pass
 
   def receive_round_result_message(self, winners, hand_info, round_state):
-    pprint.pprint(round_state)
-    # while True:
-    #   pass
-    print("---------------")
-    #pass
+    pass
 
 def setup_ai():
-  return RandomPlayer()
+  return RaisedPlayer()
