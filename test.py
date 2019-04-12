@@ -1,4 +1,14 @@
 from learning_player import LearningPlayer
+import numpy as np
+import random
+import collections
+
+Experience = collections.namedtuple('Experience',
+                                    field_names=[
+                                        'state',
+                                        'action',
+                                        'new_state'
+                                    ])
 
 player = LearningPlayer(True)
 
@@ -46,3 +56,18 @@ round_state = {
 player.uuid = 'lel'
 
 len(player._gen_feat_vector(hole_card, round_state))
+round(22/2)
+
+for i in range(10000):
+    exp = Experience(np.random.rand(20),
+                     random.choice([0, 1, 2]),
+                     np.random.rand(20))
+
+    player.exp_buffer.append(exp)
+
+
+len(player.exp_buffer)
+
+states, actions, next_states = player.exp_buffer.sample(32)
+
+next_states

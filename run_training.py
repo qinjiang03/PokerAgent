@@ -3,7 +3,7 @@ from randomplayer import RandomPlayer
 from learning_player import LearningPlayer
 
 # How many episodes to train for
-NUM_ROUNDS = 10
+NUM_ROUNDS = 200
 # Path to save model weights
 MODEL_PATH = 'model.dat'
 # Path to save training stats

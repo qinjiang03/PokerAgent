@@ -25,7 +25,9 @@ Experience = collections.namedtuple('Experience',
 
 class LearningPlayer(BasePokerPlayer):
 
-    def __init__(self, training=False, model_path='model.dat', stats_path='stats.csv'):
+    def __init__(self, training=False,
+                 model_path='model.dat', stats_path='stats.csv',
+                 model_weights=None):
         self.numGames = 0
         self.numFolds_opp = 0
         self.numActions_opp = 0
@@ -36,12 +38,15 @@ class LearningPlayer(BasePokerPlayer):
         self.training = training
         self.MODEL_PATH = model_path
         self.STATS_PATH = stats_path
+        self.MODEL_WEIGHTS = model_weights
         # Initialize our neural net
-        self.N_FEAT = 20
+        self.N_FEAT = 21
         self.N_ACTIONS = 3
-        self.N_HIDDEN = round((self.N_FEAT + self.N_ACTIONS) / 2)
+        self.N_HIDDEN = int((self.N_FEAT + self.N_ACTIONS) / 2)
         self.N_LAYERS = 1
         self.net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
+        if self.MODEL_WEIGHTS is not None:
+            self.net.load_state_dict(torch.load(self.MODEL_WEIGHTS))
         # Counter of frames
         self.frame_i = 0
 
@@ -68,6 +73,8 @@ class LearningPlayer(BasePokerPlayer):
 
             # Target net
             self.tgt_net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
+            if self.MODEL_WEIGHTS is not None:
+                self.tgt_net.load_state_dict(torch.load(self.MODEL_WEIGHTS))
             self.optimizer = optim.Adam(self.net.parameters(),
                                         lr=self.LEARNING_RATE)
             # Initialize experience buffer
@@ -207,7 +214,7 @@ class LearningPlayer(BasePokerPlayer):
 
     def _gen_feat_vector(self, hole_card, round_state):
         MAX_HAND_STR = 8429805.0
-        STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4}
+        STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4, "showdown": 5}
 
         potAmt = round_state["pot"]["main"]["amount"]
         stacks = [seat["stack"] for seat in round_state["seats"]]
@@ -376,7 +383,7 @@ class LearningPlayer(BasePokerPlayer):
             # - mean_reward
             # - reward
             # - stack
-            with open(self.STATS_PATH, mode='w') as stats:
+            with open(self.STATS_PATH, mode='a') as stats:
                 stats_writer = csv.writer(stats, delimiter=',')
                 stats_writer.writerow([self.frame_i, self._epsilon(),
                                        mean_reward, reward, stack])
