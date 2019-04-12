@@ -37,9 +37,9 @@ class LearningPlayer(BasePokerPlayer):
         self.MODEL_PATH = model_path
         self.STATS_PATH = stats_path
         # Initialize our neural net
-        self.N_FEAT = 19
+        self.N_FEAT = 20
         self.N_ACTIONS = 3
-        self.N_HIDDEN = (self.N_FEAT + self.N_ACTIONS) / 2
+        self.N_HIDDEN = round((self.N_FEAT + self.N_ACTIONS) / 2)
         self.N_LAYERS = 1
         self.net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
         # Counter of frames
