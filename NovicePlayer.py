@@ -18,12 +18,14 @@ class NovicePlayer(BasePokerPlayer):
   def __init__(self):
     #for call and raise only, since you cannot observe opponent hand when his fold
     #opp_model = [low, high, probability within k*standard_deviation, k = sqrt(standard_deviation)]
-    self.opp_model = [[0, 0],[0, 0]]
+    self.opp_model = list((0, 0, 0, 0))
     #to observe the action perform in that sequence given the believe EHS at that current state (got opponent hand from showdown, do the same as our hand)
     #assume opponent action depend on his current observance of his own EHS
     #opponent must be consistent at least within 30 - 50 rounds
     self.raiseEHS = list()
+    self.raiseEHS.append(0)
     self.callEHS = list()
+    self.callEHS.append(0)
     self.action_sequence = str()
     self.action_tree = SequenceActionTree()
     self.action_tree.generate_tree(20)
@@ -50,17 +52,20 @@ class NovicePlayer(BasePokerPlayer):
         self.action_sequence = "cr" 
         self.player_position = "small_blind"
         self.player_uuid = round_state['action_histories']['preflop'][0]['uuid']
-      #print self.player_uuid
 
     self.update_lastest_history(round_state)
     current_node = self.action_tree.search_node_by_name(self.action_sequence)
     
+    opp_model_action = None
     #fail safe in case tree construction have error
     if current_node == None:
       print "tree construction has error", self.action_sequence
       opp_model_action = None
     else:
-      opp_model_action = self.action_tree.declare_action(current_node, 1, opp_model)
+      #test method at turn
+      if round_state['street'] == "TURN":
+        print(self.action_tree.all_leaf_node_in_current_street(current_node))
+        opp_model_action = self.action_tree.declare_action(current_node, 1, opp_model)
 
     #there is not enough data to declare action
     #put honest player here
@@ -94,30 +99,88 @@ class NovicePlayer(BasePokerPlayer):
         update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
         EHS_opp = PlayerUtil.hand_strength(opp_card, round_state['community_card'])
         node = self.action_tree.search_node_by_name(update_node_action_sequence)
+        if node == None:
+          print update_node_action_sequence
         node.history_cell.update_action_frequency_cell(EHS_opp)
-        #add to raiseEHS and callEHS base on agressive ratio of player
-        #may not add compulsory action since player decision is not based on his current EHS 
+        self.update_call_raise_EHS(round_state, 3, EHS_opp)
 
         #turn
         update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 2) 
         node = self.action_tree.search_node_by_name(update_node_action_sequence)
         #use precompute method here later
-        EHS_opp = 0.457 #PlayerUtil.effective_hand_strength(opp_card, round_state['community_card'])
+        EHS_opp = 0.457
         node.history_cell.update_action_frequency_cell(EHS_opp)
+        self.update_call_raise_EHS(round_state, 2, EHS_opp)
 
         #flop
         update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
         node = self.action_tree.search_node_by_name(update_node_action_sequence)
         #use precompute method here later
-        EHS_opp = 0.5#PlayerUtil.effective_hand_strength(opp_card, round_state['community_card'])
+        EHS_opp = 0.5
         node.history_cell.update_action_frequency_cell(EHS_opp)
+        self.update_call_raise_EHS(round_state, 1, EHS_opp)
+
+        self.update_opp_model()
+        print self.opp_model
 
     #reset variable here
-    print winners
     self.action_sequence = ""
 
   def setup_ai():
     return NovicePlayer()
+
+  def update_opp_model(self):
+    call_mean = PlayerUtil.calculate_mean(self.callEHS)
+    call_var = PlayerUtil.calculate_var(self.callEHS)
+
+    raise_mean = PlayerUtil.calculate_mean(self.raiseEHS)
+    raise_var = PlayerUtil.calculate_var(self.raiseEHS)
+    
+    self.opp_model[0] = call_mean - call_var
+    self.opp_model[1] = call_mean + call_var
+    self.opp_model[2] = raise_mean - raise_var
+    self.opp_model[3] = raise_mean + raise_var
+
+  def update_call_raise_EHS(self, round_state, street, EHS_opp):
+    no_call_raise = self.number_of_raise_call_at_street(round_state, street)
+    threshold = 1500
+    forget = 20
+
+    for i in range(no_call_raise[0]):
+      self.callEHS.append(EHS_opp)
+
+    for i in range(no_call_raise[1]):
+      self.raiseEHS.append(EHS_opp)
+
+    if len(self.callEHS) > threshold:
+      for i in range(forget):
+        self.callEHS.pop(0)
+    
+    if len(self.raiseEHS) > threshold:
+      for i in range(forget):
+        self.raiseEHS.pop(0)        
+
+  def number_of_raise_call_at_street(self, round_state, street):
+    c = 0
+    r = 0
+  
+    if street == 0:
+      action_list = round_state['action_histories']['preflop']
+    elif street == 1:
+      action_list = round_state['action_histories']['flop']
+    elif street == 2:
+      action_list = round_state['action_histories']['turn']
+    elif street == 3:
+      action_list = round_state['action_histories']['river']
+    
+    for action in action_list:
+      if action['action'] == "RAISE" and action['uuid'] != self.player_uuid:
+        r += 1
+      elif action['action'] == "CALL" and action['uuid'] != self.player_uuid:
+        c += 1
+    if r == 2:
+      c -= 1
+    return (c, r)   
 
   def leaf_node_sequence_at_street(self, round_state, street):
     if self.player_position == "small_blind":
@@ -135,11 +198,11 @@ class NovicePlayer(BasePokerPlayer):
         action_list = round_state['action_histories']['turn']
       elif i == 3:
         action_list = round_state['action_histories']['river']
-  
-      for action in action_list:
-        if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
-           street_action_sequence += self.action_mapping(action['action'])
-      street_action_sequence += "|"
+      if len(action_list) > 0:
+        for action in action_list:
+          if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
+             street_action_sequence += self.action_mapping(action['action'])
+        street_action_sequence += "|"
 
     return street_action_sequence
 
@@ -160,13 +223,13 @@ class NovicePlayer(BasePokerPlayer):
         action_list = round_state['action_histories']['turn']
       elif i == 3:
         action_list = round_state['action_histories']['river']
-  
-      for action in action_list:
-        if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
-          self.action_sequence += self.action_mapping(action['action'])
-      #append at the end of street if action in the lastest street is call that is not double call  
-      if i < current_no_street - 1 or (i == current_no_street - 1 and action['action'] == "CALL" and self.action_sequence[len(self.action_sequence) - 2] != "|"):
-        self.action_sequence += "|"
+      if len(action_list) > 0:
+        for action in action_list:
+          if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
+            self.action_sequence += self.action_mapping(action['action'])
+        #append at the end of street if action in the lastest street is call that is not double call  
+        if i < current_no_street - 1 or (i == current_no_street - 1 and action['action'] == "CALL" and self.action_sequence[len(self.action_sequence) - 2] != "|"):
+          self.action_sequence += "|"
 
   def action_mapping(self, action):
     if action  == "CALL":
@@ -218,7 +281,6 @@ class PlayerUtil:
           tied += 1
       else:
           behind += 1
-    print ahead, tied, behind
     return (ahead + tied / 2.0) / (ahead + tied + behind)
 
   @staticmethod  
@@ -309,21 +371,31 @@ class HistoryCell:
     self.total_data_point += 1
 
   #Probability of opponent having action from the node that contain this cell 
+  def pr_EHS_range_call_only(self, opp_model):
+    callPr = 0.0
+    total = 0.0
+    #call probability
+    for i in range(int(opp_model[0]*10 - 1), int(math.ceil(opp_model[1]*10 - 1))):
+      total += EHS_frequency_cell[i]
+    
+    callPr = float(total)/self.total_data_point
+    return [1 - callPr, callPr]
+
   def pr_EHS_range(self, opp_model):
     callPr = 0.0
     raisePr = 0.0
-    total = 0
+    total = 0.0
     #call probability
-    for i in range(int(opp_model[0][0]*10 - 1), int(opp_model[0][1]*10), 1):
+    for i in range(int(opp_model[0]*10 - 1), int(math.ceil(opp_model[1]*10 - 1))):
       total += EHS_frequency_cell[i]
     
-    callPr = total/self.total_data_point
-    total = 0
+    callPr = float(total)/self.total_data_point
+    total = 0.0
 
     #raise probability
-    for i in range(int(opp_model[1][0]*10 - 1), int(opp_model[1][1]*10), 1):
+    for i in range(int(opp_model[2]*10 - 1), int(math.ceil(opp_model[3]*10 - 1))):
       total += EHS_frequency_cell[i]
-    raisePr = total/self.total_data_point
+    raisePr = float(total)/self.total_data_point
 
     return [1 - callPr - raisePr, callPr, raisePr]
 
@@ -345,10 +417,10 @@ class SequenceActionTree:
   def search_node_by_name(self, name):
     return search.find_by_attr(self.root, name, name = 'name')
 
-  #To search for all node leaf node at current street given the depth = number of street player
-  def return_all_leaf_node_in_current_street(self, current_node, depth):
+  #To search for all node leaf node at current street given current node and the depth = number of street player
+  def all_leaf_node_in_current_street(self, current_node, depth):
     current_street = copy.deepcopy(current_node.round_state.current_street)
-    if current_street + depth > Const.Street.RIVER
+    if current_street + depth > Const.Street.RIVER:
       return None
     else:
       return search.findall(current_node, filter_=lambda node: (node.round_state.current_street == current_street + depth) and node.history_cell != None)
@@ -362,37 +434,57 @@ class SequenceActionTree:
     return True 
 
   def push_eva(self, current_node, node_list, opp_model):
+    #compute eva for every leaf node
+    for node in node_list:
+      if node.name[len(name) - 1] != "f":
+        #evaluation function here
+        node.eva = 0#Eval()
+
+    #push eva 
     for leaf in node_list:
       parent = leaf.parent
       #level order transverse using parent, then compute eva for each child
       child_list = LevelOrderIter(current_node, maxLevel = 1)
 
       #remove any already compute from the node_list
-
+      node_list = list(set(node_list) - set(child_list))
       #add the parent to the list if parent is not current node
+      if parent != current_node:
+        node_list.append(parent)
 
       #parent is player node
       if parent.round_state.player_state.player_no == 0:
-        #Max eva child list
-        return 0
+        parent.eva = -100000000.0
+        for child in child_list:
+          if child.eva > eva:
+            eva = child.eva
       
       #parent is opp node
-      elif leaf.parent.round_state.player_state.player_no == 0: 
-        #linear sum of probability
-        pr_opp_action = leaf.history_cell.pr_EHS_range(opp_model)
+      elif parent.round_state.player_state.player_no == 1: 
+        #cannot raise
         parent.eva = 0
-        for child in child_list:
-          if child.name[len(name)-1] == "f":
-            parent.eva += child.eva*pr_opp_action[0]
-          elif child.name[len(name)-1] == "r":
-            parent.eva += child.eva*pr_opp_action[2]
-          else:
-            parent.eva += child.eva*pr_opp_action[1]
+        if len(child_list) == 2:
+          pr_opp_action = leaf.history_cell.pr_EHS_range_call_only(opp_model)
+          for child in child_list:
+            if child.name[len(name)-1] == "f":
+              parent.eva += child.eva*pr_opp_action[0]
+            else:
+              parent.eva += child.eva*pr_opp_action[1]
+        
+        else:
+          pr_opp_action = leaf.history_cell.pr_EHS_range(opp_model)
+          for child in child_list:
+            if child.name[len(name)-1] == "f":
+              parent.eva += child.eva*pr_opp_action[0]
+            elif child.name[len(name)-1] == "r":
+              parent.eva += child.eva*pr_opp_action[2]
+            else:
+              parent.eva += child.eva*pr_opp_action[1]
 
   def declare_action(self, current_node, depth, opp_model):
     #max eva of the child using level transverse
     action = None
-    cut_off_nodes = self.return_all_leaf_node_in_current_street(current_node, 1)
+    cut_off_nodes = self.all_leaf_node_in_current_street(current_node, depth)
     if self.check_opp_model_availability(cut_off_nodes) == False:
       return action
     self.push_eva(current_node, cut_off_nodes, opp_model)
@@ -550,7 +642,6 @@ class SequenceActionTree:
                 p_queue.put(node)
     
 class RoundState:
-
   def __init__(self):
     self.current_street = 0
     self.pot = 0
