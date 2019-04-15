@@ -63,9 +63,7 @@ class NovicePlayer(BasePokerPlayer):
       opp_model_action = None
     else:
       #test method at turn
-      if round_state['street'] == "TURN":
-        print(self.action_tree.all_leaf_node_in_current_street(current_node))
-        opp_model_action = self.action_tree.declare_action(current_node, 1, opp_model)
+      opp_model_action = self.action_tree.declare_action(current_node, 1, self.opp_model)
 
     #there is not enough data to declare action
     #put honest player here
@@ -99,8 +97,6 @@ class NovicePlayer(BasePokerPlayer):
         update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
         EHS_opp = PlayerUtil.hand_strength(opp_card, round_state['community_card'])
         node = self.action_tree.search_node_by_name(update_node_action_sequence)
-        if node == None:
-          print update_node_action_sequence
         node.history_cell.update_action_frequency_cell(EHS_opp)
         self.update_call_raise_EHS(round_state, 3, EHS_opp)
 
@@ -121,7 +117,6 @@ class NovicePlayer(BasePokerPlayer):
         self.update_call_raise_EHS(round_state, 1, EHS_opp)
 
         self.update_opp_model()
-        print self.opp_model
 
     #reset variable here
     self.action_sequence = ""
@@ -418,6 +413,7 @@ class SequenceActionTree:
     return search.find_by_attr(self.root, name, name = 'name')
 
   #To search for all node leaf node at current street given current node and the depth = number of street player
+  #bug here
   def all_leaf_node_in_current_street(self, current_node, depth):
     current_street = copy.deepcopy(current_node.round_state.current_street)
     if current_street + depth > Const.Street.RIVER:
