@@ -1,13 +1,16 @@
 from pypokerengine.api.game import setup_config, start_poker
 from randomplayer import RandomPlayer
+from raise_player import RaisedPlayer
 from learning_player import LearningPlayer
+from custom.call_player import CallPlayer
+from custom.honest_player import HonestPlayer
 
 # How many episodes to train for
 NUM_ROUNDS = 200
 # Path to save model weights
-MODEL_PATH = 'model.dat'
+MODEL_PATH = 'model_random.dat'
 # Path to save training stats
-STATS_PATH = 'stats.csv'
+STATS_PATH = 'stats_random.csv'
 
 config = setup_config(max_round=NUM_ROUNDS, initial_stack=10000, small_blind_amount=10)
 

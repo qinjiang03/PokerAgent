@@ -43,7 +43,7 @@ class LearningPlayer(BasePokerPlayer):
         self.N_FEAT = 21
         self.N_ACTIONS = 3
         self.N_HIDDEN = int((self.N_FEAT + self.N_ACTIONS) / 2)
-        self.N_LAYERS = 1
+        self.N_LAYERS = 2
         self.net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
         if self.MODEL_WEIGHTS is not None:
             self.net.load_state_dict(torch.load(self.MODEL_WEIGHTS))
@@ -214,13 +214,15 @@ class LearningPlayer(BasePokerPlayer):
 
     def _gen_feat_vector(self, hole_card, round_state):
         MAX_HAND_STR = 8429805.0
+        MAX_POT = ((2*2) + 0 + (4*4*2) + (4*4*2)) * round_state["small_blind_amount"]
         STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4, "showdown": 5}
 
         potAmt = round_state["pot"]["main"]["amount"]
         stacks = [seat["stack"] for seat in round_state["seats"]]
         TOTAL_STACK = potAmt + sum(stack for stack in stacks)
 
-        potFrac = [potAmt * 1.0 / TOTAL_STACK]
+        # potFrac = [potAmt * 1.0 / TOTAL_STACK]
+        potFrac = [potAmt * 1.0 / MAX_POT]
         stackFracs = [stack * 1.0 / TOTAL_STACK for stack in stacks]
 
         handStr = [self._get_hand_strength(hole_card, round_state["community_card"]) / MAX_HAND_STR]
