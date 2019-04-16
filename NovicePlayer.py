@@ -5,6 +5,7 @@ from pypokerengine.engine.hand_evaluator import HandEvaluator
 from pypokerengine.engine.card import Card
 from pypokerengine.engine.poker_constants import PokerConstants as Const
 from anytree import Node, Walker, RenderTree, ContStyle, search, LevelOrderIter
+from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
 from custom import helper_functions
 import queue
 import random as rand
@@ -13,12 +14,13 @@ import numpy
 import itertools
 import copy
 import math
+from operator import attrgetter
 
 class NovicePlayer(BasePokerPlayer):
   def __init__(self):
     #for call and raise only, since you cannot observe opponent hand when his fold
     #opp_model = [low, high, probability within k*standard_deviation, k = sqrt(standard_deviation)]
-    self.opp_model = list((0, 0, 0, 0))
+    self.opp_model = list((0.0, 0.0, 0.0, 0.0))
     #to observe the action perform in that sequence given the believe EHS at that current state (got opponent hand from showdown, do the same as our hand)
     #assume opponent action depend on his current observance of his own EHS
     #opponent must be consistent at least within 30 - 50 rounds
@@ -61,19 +63,39 @@ class NovicePlayer(BasePokerPlayer):
     if current_node == None:
       print "tree construction has error", self.action_sequence
       opp_model_action = None
-    else:
+    elif round_state['street'] != "preflop":
       #test method at turn
-      opp_model_action = self.action_tree.declare_action(current_node, 1, self.opp_model)
+      player_hand_strength = PlayerUtil.hand_strength(self.hole_card, round_state['community_card'])
+      opp_model_action = self.action_tree.declare_action(current_node, 1, self.opp_model, player_hand_strength)
 
     #there is not enough data to declare action
     #put honest player here
     if opp_model_action == None:
-      opp_model_action = "call"
+      print("declaring using honest player")
+      if round_state["street"] == "preflop":
+          return valid_actions[1]['action']
 
-    for i in valid_actions:
-      if i["action"] == opp_model_action:
-        action = i["action"]
-        return action 
+      curStreet = round_state["action_histories"][round_state["street"]]
+      if not curStreet:
+          previousAction = None
+      elif curStreet[-1]["action"] == 'CALL':
+          previousAction = 'CALL'
+      else:
+          previousAction = 'RAISE'
+
+      win_rate = estimate_hole_card_win_rate(
+          nb_simulation=200,
+          nb_player=2,
+          hole_card=gen_cards(hole_card),
+          community_card=gen_cards(round_state['community_card'])
+      )
+      if (win_rate >= 0.8 or (win_rate >= 0.7 and previousAction == 'CALL')) and len(valid_actions) == 3:
+          action = valid_actions[2]['action']
+      elif previousAction != 'RAISE' or win_rate >= 0.3:
+          action = valid_actions[1]['action']
+      else:
+          action = valid_actions[0]['action']
+    return action 
 
   def receive_game_start_message(self, game_info):
     pass
@@ -354,6 +376,7 @@ class PlayerUtil:
 class HistoryCell:
   def __init__(self):
     self.EHS_frequency_cell = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    #self.EHS_frequency_cell = list(EHS_frequency_cell)
     self.total_data_point = 0
     self.min_data_points = 10
 
@@ -362,7 +385,7 @@ class HistoryCell:
     #round to 1 decimal, using 10 cell divider
     if EHS == 0.0:
       EHS += 0.01
-    self.EHS_frequency_cell[int(math.ceil(EHS*10 - 1))] += 1
+    self.EHS_frequency_cell[int(math.floor(EHS*10))] += 1
     self.total_data_point += 1
 
   #Probability of opponent having action from the node that contain this cell 
@@ -370,7 +393,7 @@ class HistoryCell:
     callPr = 0.0
     total = 0.0
     #call probability
-    for i in range(int(opp_model[0]*10 - 1), int(math.ceil(opp_model[1]*10 - 1))):
+    for i in range(int(math.floor(opp_model[0]*10)), int(math.floor(opp_model[1]*10))):
       total += EHS_frequency_cell[i]
     
     callPr = float(total)/self.total_data_point
@@ -381,15 +404,16 @@ class HistoryCell:
     raisePr = 0.0
     total = 0.0
     #call probability
-    for i in range(int(opp_model[0]*10 - 1), int(math.ceil(opp_model[1]*10 - 1))):
-      total += EHS_frequency_cell[i]
-    
+    for i in range(int(math.floor(opp_model[0]*10)), int(math.floor(opp_model[1]*10))):
+      total += self.EHS_frequency_cell[i]
+  
     callPr = float(total)/self.total_data_point
     total = 0.0
 
     #raise probability
-    for i in range(int(opp_model[2]*10 - 1), int(math.ceil(opp_model[3]*10 - 1))):
-      total += EHS_frequency_cell[i]
+    for i in range(int(math.floor(opp_model[2]*10)), int(math.floor(opp_model[3]*10))):
+      total += self.EHS_frequency_cell[i]
+
     raisePr = float(total)/self.total_data_point
 
     return [1 - callPr - raisePr, callPr, raisePr]
@@ -410,87 +434,101 @@ class SequenceActionTree:
 
   #to search for current position
   def search_node_by_name(self, name):
-    return search.find_by_attr(self.root, name, name = 'name')
+    return search.find_by_attr(self.root, value = name, name = 'name')
 
-  #To search for all node leaf node at current street given current node and the depth = number of street player
-  #bug here
-  def all_leaf_node_in_current_street(self, current_node, depth):
-    current_street = copy.deepcopy(current_node.round_state.current_street)
-    if current_street + depth > Const.Street.RIVER:
+  #To search for all leaf/cutoff node that need to compute evaluation at current street given current node and the depth = number of street player
+  def all_leaf_node_need_eva(self, current_node, depth):
+    current_street = current_node.round_state.current_street
+    if current_street + depth > Const.Street.RIVER + 1:
       return None
     else:
       return search.findall(current_node, filter_=lambda node: (node.round_state.current_street == current_street + depth) and node.history_cell != None)
 
+
   #To check if the cut_off node have enough data point to use
   #return false if anynode in the subtree need to search don't have enough data points to use for calculation
   def check_opp_model_availability(self, node_list):
-    for i in node_list:
-      if i.history_cell.total_data_point < i.history_cell.min_data_points:
+    for node in node_list:
+      #fail safe condition
+      if node.history_cell != None and node.history_cell.total_data_point < node.history_cell.min_data_points:
         return False    
     return True 
 
-  def push_eva(self, current_node, node_list, opp_model):
-    #compute eva for every leaf node
+  def push_eva(self, current_node, node_list, opp_model): 
+    if len(node_list) == 1:
+      return
+
+    parent_list = list()
     for node in node_list:
-      if node.name[len(name) - 1] != "f":
-        #evaluation function here
-        node.eva = 0#Eval()
-
-    #push eva 
-    for leaf in node_list:
-      parent = leaf.parent
-      #level order transverse using parent, then compute eva for each child
-      child_list = LevelOrderIter(current_node, maxLevel = 1)
-
-      #remove any already compute from the node_list
-      node_list = list(set(node_list) - set(child_list))
-      #add the parent to the list if parent is not current node
-      if parent != current_node:
-        node_list.append(parent)
-
+      if node.parent != current_node:
+        parent_list.append(node.parent)
+    
+    #consider unique parent only
+    parent_list = list(set(parent_list))
+    for parent in parent_list:
+      #find all child of a parent
+      child_list = list(search.findall(parent, filter_=lambda child: child.parent == parent, maxlevel = 2))
+      for child in child_list:
+        if child.history_cell != None:
+          child_with_history_cell = child 
+      
       #parent is player node
       if parent.round_state.player_state.player_no == 0:
-        parent.eva = -100000000.0
-        for child in child_list:
-          if child.eva > eva:
-            eva = child.eva
+        parent.eva = max(child.eva for child in child_list)
       
       #parent is opp node
       elif parent.round_state.player_state.player_no == 1: 
         #cannot raise
         parent.eva = 0
-        if len(child_list) == 2:
-          pr_opp_action = leaf.history_cell.pr_EHS_range_call_only(opp_model)
+        if len(list(child_list)) == 2:
+          pr_opp_action = child_with_history_cell.history_cell.pr_EHS_range_call_only(opp_model)
           for child in child_list:
-            if child.name[len(name)-1] == "f":
+            if child.name[len(child.name)-1] == "f":
               parent.eva += child.eva*pr_opp_action[0]
             else:
               parent.eva += child.eva*pr_opp_action[1]
-        
         else:
-          pr_opp_action = leaf.history_cell.pr_EHS_range(opp_model)
+          pr_opp_action = child_with_history_cell.history_cell.pr_EHS_range(opp_model)
+          print(pr_opp_action)
           for child in child_list:
-            if child.name[len(name)-1] == "f":
+            if child.name[len(child.name)-1] == "f":
               parent.eva += child.eva*pr_opp_action[0]
-            elif child.name[len(name)-1] == "r":
+            elif child.name[len(child.name)-1] == "r":
               parent.eva += child.eva*pr_opp_action[2]
             else:
-              parent.eva += child.eva*pr_opp_action[1]
+              parent.eva += child.eva*pr_opp_action[1]  
+    self.push_eva(current_node, parent_list, opp_model)
 
-  def declare_action(self, current_node, depth, opp_model):
+
+  def declare_action(self, current_node, depth, opp_model, our_hand_strength):
     #max eva of the child using level transverse
     action = None
-    cut_off_nodes = self.all_leaf_node_in_current_street(current_node, depth)
+    cut_off_nodes = list(self.all_leaf_node_need_eva(current_node, depth))
+    
+    #compute evaluation for cutoff nodes
+    for node in cut_off_nodes:
+      if node.name[len(node.name) - 1] != "f":
+        node.eva = 10#Evaluation funcion here
+
     if self.check_opp_model_availability(cut_off_nodes) == False:
+      print("can't declare with opp adaptive model")
       return action
+    
     self.push_eva(current_node, cut_off_nodes, opp_model)
 
-    child_list = LevelOrderIter(current_node, maxLevel = 1)
-    eva = -100000000.0
+    child_list = list(search.findall(current_node, filter_=lambda child: child.parent == current_node, maxlevel = 2))
+    max_eva = max(child.eva for child in child_list)
+    
+    #to deal with equal evaluation, currently break tie arbitrary by randomize
+    action_list = list()
     for child in child_list:
-      if child.eva > eva:
-        eva = child.eva
-        action = action_mapping(child.name[len(child.name) - 1])
+      if child.eva == max_eva:
+        action_list.append(child)
+    
+    action_node = action_list[rand.randint(1,999999)%len(action_list)]
+    
+    action = self.action_mapping(action_node.name[len(action_node.name) - 1])
+    
     return action
 
   def action_mapping(self, action_from_name):
@@ -552,10 +590,11 @@ class SequenceActionTree:
         if action[i] == "f":
           #we fold
           if player == 0:
-            eva = 0 - p_state.no_bet[player]
+            eva = 0 - p_state.no_bet[0]
+          
           #opp fold
           elif player == 1:
-            eva = r_state.pot - p_state.no_bet[player]
+            eva = p_state.no_bet[1]
           node = Node(name = name, parent = parent, round_state = r_state, history_cell = None, eva = eva)
           self.no_nodes += 1
         
