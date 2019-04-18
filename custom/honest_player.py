@@ -11,7 +11,7 @@ class HonestPlayer(BasePokerPlayer):
       action = valid_actions[1]
     else:
       win_rate = estimate_hole_card_win_rate(
-        nb_simulation=200,
+        nb_simulation=150,
         nb_player=2,
         hole_card = gen_cards(hole_card),
         community_card = gen_cards(round_state["community_card"]))

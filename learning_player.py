@@ -27,7 +27,8 @@ class LearningPlayer(BasePokerPlayer):
 
     def __init__(self, training=False,
                  model_path='model.dat', stats_path='stats.csv',
-                 model_weights=None):
+                 model_weights=None, total_rewards=[], best_mean_reward=None,
+                 n_layers=1):
         self.numGames = 0
         self.numFolds_opp = 0
         self.numActions_opp = 0
@@ -40,10 +41,10 @@ class LearningPlayer(BasePokerPlayer):
         self.STATS_PATH = stats_path
         self.MODEL_WEIGHTS = model_weights
         # Initialize our neural net
-        self.N_FEAT = 21
+        self.N_FEAT = 22
         self.N_ACTIONS = 3
         self.N_HIDDEN = int((self.N_FEAT + self.N_ACTIONS) / 2)
-        self.N_LAYERS = 2
+        self.N_LAYERS = n_layers
         self.net = DQN(self.N_FEAT, self.N_HIDDEN, self.N_ACTIONS, self.N_LAYERS)
         if self.MODEL_WEIGHTS is not None:
             self.net.load_state_dict(torch.load(self.MODEL_WEIGHTS))
@@ -81,9 +82,9 @@ class LearningPlayer(BasePokerPlayer):
             self.exp_buffer = ExperienceBuffer(self.REPLAY_SIZE)
 
             # Keep track of rewards for each episode
-            self.total_rewards = []
+            self.total_rewards = total_rewards
             # Best mean reward reached
-            self.best_mean_reward = None
+            self.best_mean_reward = best_mean_reward
             # Stores the prev state
             self.prev_feat_vector = None
             # Stores the prev action
@@ -212,10 +213,36 @@ class LearningPlayer(BasePokerPlayer):
         loss_t.backward()
         self.optimizer.step()
 
+
+    def get_opp_hand_str(self, round_state):
+        STREETS = ["preflop", "flop", "turn", "river", "showdown"]
+        currStreet = round_state["street"]
+        lastOppAct = None
+
+        if currStreet in round_state["action_histories"]:
+            oppActs = [history["action"] for history in round_state["action_histories"][currStreet] if history["uuid"] != self.uuid]
+            if len(oppActs) > 0:
+                lastOppAct = oppActs[-1]
+        while lastOppAct is None:
+            currStreetIdx = STREETS.index(currStreet)
+            prevStreet = STREETS[currStreetIdx - 1]
+            if prevStreet in round_state["action_histories"]:
+                oppActs = [history["action"] for history in round_state["action_histories"][prevStreet] if history["uuid"] != self.uuid]
+                if len(oppActs) > 0:
+                    lastOppAct = oppActs[-1]
+            currStreet = prevStreet
+        
+        if lastOppAct == "RAISE":       oppHandStr = (1 + 0.75) / 2
+        elif lastOppAct == "CALL":      oppHandStr = (0.75 + 0.3) / 2
+        elif lastOppAct == "FOLD":      oppHandStr = (0.3 + 0) / 2
+        else:                           oppHandStr = 0.5
+        
+        return oppHandStr
+
     def _gen_feat_vector(self, hole_card, round_state):
         MAX_HAND_STR = 8429805.0
         MAX_POT = ((2*2) + 0 + (4*4*2) + (4*4*2)) * round_state["small_blind_amount"]
-        STREETS = {"preflop": 1, "flop": 2, "turn": 3, "river": 4, "showdown": 5}
+        STREETS = ["preflop", "flop", "turn", "river", "showdown"]
 
         potAmt = round_state["pot"]["main"]["amount"]
         stacks = [seat["stack"] for seat in round_state["seats"]]
@@ -225,17 +252,18 @@ class LearningPlayer(BasePokerPlayer):
         potFrac = [potAmt * 1.0 / MAX_POT]
         stackFracs = [stack * 1.0 / TOTAL_STACK for stack in stacks]
 
+        oppHandStr = [self.get_opp_hand_str(round_state)]
         handStr = [self._get_hand_strength(hole_card, round_state["community_card"]) / MAX_HAND_STR]
-        streetNum = [num for street, num in STREETS.items() if round_state["street"] == street]
+        streetNum = [STREETS.index(round_state["street"]) + 1]
         isSmallBlind = [1] if round_state["next_player"] == round_state["small_blind_pos"] else [0]
         numRaiseSelf = [sum(1 if history["action"] == "RAISE" and history["uuid"] == self.uuid else 0 \
                         for history in round_state["action_histories"][street]) / 4.0 \
                         if street in round_state["action_histories"] else 0 \
-                        for street in STREETS.keys()]
+                        for street in STREETS]
         numRaiseOpp = [sum(1 if history["action"] == "RAISE" and history["uuid"] != self.uuid else 0 \
                         for history in round_state["action_histories"][street]) / 4.0 \
                         if street in round_state["action_histories"] else 0 \
-                        for street in STREETS.keys()]
+                        for street in STREETS]
         totalRaiseSelf = [sum(numRaiseSelf)]
         totalRaiseOpp = [sum(numRaiseOpp)]
 
@@ -243,7 +271,7 @@ class LearningPlayer(BasePokerPlayer):
         histCallOpp = [self.numCalls_opp * 1.0 / self.numActions_opp] if self.numActions_opp != 0 else [0.0]
         histRaiseOpp = [self.numRaises_opp * 1.0 / self.numActions_opp] if self.numActions_opp != 0 else [0.0]
 
-        features = handStr + streetNum + isSmallBlind \
+        features = handStr + oppHandStr + streetNum + isSmallBlind \
           + numRaiseSelf + numRaiseOpp + totalRaiseSelf + totalRaiseOpp \
           + potFrac + stackFracs \
           + histFoldOpp + histCallOpp + histRaiseOpp
@@ -356,7 +384,11 @@ class LearningPlayer(BasePokerPlayer):
 
         self.total_rewards.append(reward)
         # Calculate mean reward
-        mean_reward = np.mean(self.total_rewards[-100:])
+        try:
+            mean_reward = np.mean(self.total_rewards[-100:])
+        except Exception as e:
+            print(self.total_rewards)
+            raise(e)
         # Calulate time taken for one episode
         time_taken = time.time() - self.ts
 
@@ -384,11 +416,12 @@ class LearningPlayer(BasePokerPlayer):
             # - epsilon
             # - mean_reward
             # - reward
+            # - best_mean_reward
             # - stack
             with open(self.STATS_PATH, mode='a') as stats:
                 stats_writer = csv.writer(stats, delimiter=',')
-                stats_writer.writerow([self.frame_i, self._epsilon(),
-                                       mean_reward, reward, stack])
+                stats_writer.writerow([len(self.total_rewards), self.frame_i, self._epsilon(),
+                                       mean_reward, reward, self.best_mean_reward, stack])
 
 
 

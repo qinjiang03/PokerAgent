@@ -8,6 +8,7 @@ class RaisedPlayer(BasePokerPlayer):
     # print("Raise Player")
     # print("Valid Actions : ")
     # pprint.pprint(valid_actions)
+    # pprint.pprint(round_state)
     for i in valid_actions:
         if i["action"] == "raise":
             action = i["action"]
