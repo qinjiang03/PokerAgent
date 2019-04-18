@@ -10,7 +10,7 @@ from anytree import Node, Walker, RenderTree, ContStyle, search, LevelOrderIter
 from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
 from custom import helper_functions as helper
 
-import queue
+import Queue as queue
 import random as rand
 import pprint
 import numpy
@@ -20,8 +20,9 @@ import math
 import csv
 
 class NovicePlayer(BasePokerPlayer):
-  TABLE = None
+  
   def __init__(self):
+    
     #for call and raise only, since you cannot observe opponent hand when his fold
     #opp_model = [low, high, probability within k*standard_deviation, k = sqrt(standard_deviation)]
     self.opp_model = list((0.0, 0.0, 0.0, 0.0))
@@ -38,11 +39,13 @@ class NovicePlayer(BasePokerPlayer):
     self.hole_card = None
     self.player_position = None
     self.player_uuid = None
-
+    
+    print("Reading table...")
     filename = "custom/prob.csv"
     with open(filename,'r') as file:
         reader = csv.reader(file)
-        NovicePlayer.TABLE = {rows[0]:rows[1] for rows in reader}
+        self.TABLE = {rows[0]:rows[1] for rows in reader}
+    print("End of init")
 
     #print self.action_tree.no_nodes
     #print(RenderTree(self.action_tree.root, style=ContStyle()).by_attr("name"))
@@ -152,7 +155,7 @@ class NovicePlayer(BasePokerPlayer):
           community_card.pop()
           update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
           node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = 0.2 #NovicePlayer.lookupProb(opp_card, community_card)
+          pro_win_opp = self.lookupProb(opp_card, community_card)
           node.history_cell.update_action_frequency_cell(pro_win_opp)
           self.update_call_raise_EHS(round_state, 1, pro_win_opp)
 
@@ -177,11 +180,10 @@ class NovicePlayer(BasePokerPlayer):
     key = suitKey + "_" + valueKey
     return key
       
-  @staticmethod
-  def lookupProb(holeCards, commCards):
+  def lookupProb(self, holeCards, commCards):
     key = NovicePlayer.mapCardsToKey(holeCards, [])
     if len(commCards) > 0: key += "_" + NovicePlayer.mapCardsToKey(holeCards, commCards)
-    return float(NovicePlayer.TABLE[key])
+    return float(self.TABLE[key])
   
   def update_opp_model(self):
     call_mean = PlayerUtil.calculate_mean(self.callEHS)
@@ -549,7 +551,8 @@ class SequenceActionTree:
     if round_state['street'] == "flop":
       #precompute go here, fix this
       print("Timeout here") 
-      pro_win = 0.3 #NovicePlayer.lookupProb(hole_card, round_state['community_card']) 
+      print("############## SEQUENCE ACTION TREE: LOOK UP PROB ################")
+      pro_win = self.lookupProb(hole_card, round_state['community_card']) 
     else:
       pro_win = estimate_hole_card_win_rate(
           nb_simulation=100,
