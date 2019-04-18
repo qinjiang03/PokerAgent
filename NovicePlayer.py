@@ -7,9 +7,12 @@ from pypokerengine.engine.deck import Deck
 from time import sleep
 from pypokerengine.engine.poker_constants import PokerConstants as Const
 from anytree import Node, Walker, RenderTree, ContStyle, search, LevelOrderIter
+from anytree.exporter import DictExporter, JsonExporter
+from anytree.importer import DictImporter, JsonImporter
 from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
 from custom import helper_functions as helper
 
+#import torch
 import queue
 import random as rand
 import pprint
@@ -18,6 +21,7 @@ import itertools
 import copy
 import math
 import csv
+import os
 
 class NovicePlayer(BasePokerPlayer):
   def __init__(self):
@@ -32,19 +36,33 @@ class NovicePlayer(BasePokerPlayer):
     self.callEHS = list()
     self.callEHS.append(0)
     self.action_sequence = str()
-    self.action_tree = SequenceActionTree()
-    self.action_tree.generate_tree(20)
+    importer = JsonImporter()
+    
+    tree_json = open("tree.json", "r")
+    
+    if os.path.getsize("tree.json") > 0:  
+      data = importer.read(tree_json)
+      self.action_tree = importer.import_(data)
+    else:
+      print("generate_tree")
+      self.action_tree = SequenceActionTree()
+      self.action_tree.generate_tree(20)
+      # exporter = JsonExporter(indent=2, sort_keys=True)
+      # data = exporter.export(self.action_tree.root)
+      # tree_json = open("tree.json", "w")
+      # exporter.write(self.action_tree.root, tree_json)    
+    
     self.hole_card = None
     self.player_position = None
     self.player_uuid = None
     self.total_decision = 0
     self.adaptive_decision = 0
 
+    #open precompute prob
     filename = "custom/prob.csv"
     with open(filename,'r') as file:
         reader = csv.reader(file)
         self.TABLE = {rows[0]:rows[1] for rows in reader}
-
 
     #print self.action_tree.no_nodes
     #print(RenderTree(self.action_tree.root, style=ContStyle()).by_attr("name"))
@@ -109,7 +127,7 @@ class NovicePlayer(BasePokerPlayer):
           previousAction = 'RAISE'
 
       win_rate = estimate_hole_card_win_rate(
-          nb_simulation=150,
+          nb_simulation=200,
           nb_player=2,
           hole_card=gen_cards(hole_card),
           community_card=gen_cards(round_state['community_card'])
@@ -123,7 +141,12 @@ class NovicePlayer(BasePokerPlayer):
       return action 
 
   def receive_game_start_message(self, game_info):
-    print(self.adaptive_decision, self.total_decision, float(self.adaptive_decision)/float(self.total_decision))
+    print(self.adaptive_decision, self.total_decision)
+    # exporter = JsonExporter(indent=2, sort_keys=True)
+    # data = exporter.export(self.action_tree.root)
+    # tree_json = open("tree.json", "w")
+    # exporter.write(self.action_tree.root, tree_json)
+
 
   def receive_round_start_message(self, round_count, hole_card, seats):
     self.hole_card = hole_card
@@ -136,46 +159,48 @@ class NovicePlayer(BasePokerPlayer):
 
   def receive_round_result_message(self, winners, hand_info, round_state):
     #get opp card from here
-    if round_state['street'] == "showdown":
+    if round_state['street'] == "showdown" and len(round_state['action_histories']) >= 4:
       for i in hand_info:
         if i['hand']['card'] != self.hole_card:
           opp_card = i['hand']['card']
           community_card = copy.deepcopy(round_state['community_card'])
-          
+          try:
           #river
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
-          pro_win_opp = estimate_hole_card_win_rate(
-              nb_simulation=100,
-              nb_player=2,
-              hole_card=gen_cards(opp_card),
-              community_card=gen_cards(community_card)
-          )
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 3, pro_win_opp)
+            update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
+            pro_win_opp = estimate_hole_card_win_rate(
+                nb_simulation=100,
+                nb_player=2,
+                hole_card=gen_cards(opp_card),
+                community_card=gen_cards(community_card)
+            )
+            node = self.action_tree.search_node_by_name(update_node_action_sequence)
+            node.history_cell.update_action_frequency_cell(pro_win_opp)
+            self.update_call_raise_EHS(round_state, 3, pro_win_opp)
 
-          #turn
-          community_card.pop()
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 2) 
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = estimate_hole_card_win_rate(
-              nb_simulation=100,
-              nb_player=2,
-              hole_card=gen_cards(opp_card),
-              community_card=gen_cards(community_card)
-          )
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 2, pro_win_opp)
+            #turn
+            community_card.pop()
+            update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 2) 
+            node = self.action_tree.search_node_by_name(update_node_action_sequence)
+            pro_win_opp = estimate_hole_card_win_rate(
+                nb_simulation=100,
+                nb_player=2,
+                hole_card=gen_cards(opp_card),
+                community_card=gen_cards(community_card)
+            )
+            node.history_cell.update_action_frequency_cell(pro_win_opp)
+            self.update_call_raise_EHS(round_state, 2, pro_win_opp)
 
-          #flop
-          community_card.pop()
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = self.lookupProb(opp_card, community_card)
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 1, pro_win_opp)
+            #flop
+            community_card.pop()
+            update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
+            node = self.action_tree.search_node_by_name(update_node_action_sequence)
+            pro_win_opp = self.lookupProb(opp_card, community_card)
+            node.history_cell.update_action_frequency_cell(pro_win_opp)
+            self.update_call_raise_EHS(round_state, 1, pro_win_opp)
 
-          self.update_opp_model()
+            self.update_opp_model()
+          except AttributeError as e:
+            print(update_node_action_sequence)
 
     #reset variable here
     self.action_sequence = ""
@@ -183,8 +208,7 @@ class NovicePlayer(BasePokerPlayer):
   def setup_ai():
     return NovicePlayer()
 
-  @staticmethod  
-  def mapCardsToKey(holeCards, commCards):
+  def mapCardsToKey(self, holeCards, commCards):
     SUITS = ['D','C','H','S']
     VALUES = ['A','K','Q','J','T'] + [str(i) for i in range(9,1,-1)]
     suitCount = [sum(card[0] == suit for card in holeCards) + sum(card[0] == suit for card in commCards) for suit in SUITS]
@@ -197,8 +221,8 @@ class NovicePlayer(BasePokerPlayer):
     return key
       
   def lookupProb(self, holeCards, commCards):
-    key = NovicePlayer.mapCardsToKey(holeCards, [])
-    if len(commCards) > 0: key += "_" + NovicePlayer.mapCardsToKey(holeCards, commCards)
+    key = self.mapCardsToKey(holeCards, [])
+    if len(commCards) > 0: key += "_" + self.mapCardsToKey(holeCards, commCards)
     return float(self.TABLE[key])
   
   def update_opp_model(self):
@@ -261,24 +285,27 @@ class NovicePlayer(BasePokerPlayer):
     else:
       street_action_sequence= "r"
 
-    #print current_no_street
-    for i in range(street + 1):
-      if i == 0:
-        action_list = round_state['action_histories']['preflop']
-      elif i == 1:
-        action_list = round_state['action_histories']['flop']
-      elif i == 2:
-        action_list = round_state['action_histories']['turn']
-      elif i == 3:
-        action_list = round_state['action_histories']['river']
-      if len(action_list) > 0:
-        for action in action_list:
-          if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
-             street_action_sequence += self.action_mapping(action['action'])
-        if street_action_sequence != "crc" and street_action_sequence != "rc":
-        street_action_sequence += "|"
+    try:
+      for i in range(street + 1):
+        if i == 0:
+          action_list = round_state['action_histories']['preflop']
+        elif i == 1:
+          action_list = round_state['action_histories']['flop']
+        elif i == 2:
+          action_list = round_state['action_histories']['turn']
+        elif i == 3:
+          action_list = round_state['action_histories']['river']
+        if len(action_list) > 0:
+          for action in action_list:
+            if action['action'] != "SMALLBLIND" and action['action'] != "BIGBLIND":
+               street_action_sequence += self.action_mapping(action['action'])
+          if street_action_sequence != "crc" and street_action_sequence != "rc":
+            street_action_sequence += "|"
 
-    return street_action_sequence
+      return street_action_sequence
+    except KeyError as e:
+      print(round_state['action_histories'])
+      print(street)
 
   def update_lastest_history(self, round_state):
     if self.player_position == "small_blind":
@@ -501,7 +528,7 @@ class SequenceActionTree:
     if current_street + depth > Const.Street.RIVER + 1:
       return None
     else:
-      return search.findall(current_node, filter_=lambda node: (node.round_state.current_street == current_street + depth) and node.history_cell != None)
+      return search.findall(current_node, filter_=lambda node: (node.round_state.current_street == current_street + depth) and node.history_cell != None, maxlevel = depth*7)
 
   #To check if the cut_off node have enough data point to use
   #return false if anynode in the subtree need to search don't have enough data points to use for calculation
@@ -577,6 +604,8 @@ class SequenceActionTree:
     action_node = action_list[rand.randint(1,999)%len(action_list)]
     
     action = self.action_mapping(action_node.name[len(action_node.name) - 1])
+    if action == "fold":
+      action == "call"
     
     return action
 
