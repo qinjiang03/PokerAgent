@@ -20,7 +20,6 @@ import math
 import csv
 
 class NovicePlayer(BasePokerPlayer):
-  TABLE = None
   def __init__(self):
     #for call and raise only, since you cannot observe opponent hand when his fold
     #opp_model = [low, high, probability within k*standard_deviation, k = sqrt(standard_deviation)]
@@ -42,7 +41,8 @@ class NovicePlayer(BasePokerPlayer):
     filename = "custom/prob.csv"
     with open(filename,'r') as file:
         reader = csv.reader(file)
-        NovicePlayer.TABLE = {rows[0]:rows[1] for rows in reader}
+        self.TABLE = {rows[0]:rows[1] for rows in reader}
+
 
     #print self.action_tree.no_nodes
     #print(RenderTree(self.action_tree.root, style=ContStyle()).by_attr("name"))
@@ -73,7 +73,24 @@ class NovicePlayer(BasePokerPlayer):
       print "tree construction has error", self.action_sequence
       opp_model_action = None
     elif round_state['street'] != "preflop":
-      opp_model_action = self.action_tree.declare_action(self.hole_card, current_node, 1, self.opp_model, round_state)
+      cut_off_nodes = list(self.action_tree.all_leaf_node_need_eva(current_node, 1))
+      if self.action_tree.check_opp_model_availability(cut_off_nodes) == True:
+        print("declare using opp adaptive model")
+        print("") 
+        if round_state['street'] == "flop":
+          prob_win = self.lookupProb(hole_card, round_state['community_card']) 
+        else:
+          prob_win = estimate_hole_card_win_rate(
+              nb_simulation=100,
+              nb_player=2,
+              hole_card=gen_cards(hole_card),
+              community_card=gen_cards(round_state['community_card'])
+          )
+        opp_model_action = self.action_tree.declare_action(self.hole_card, current_node, 1, self.opp_model, round_state, cut_off_nodes, prob_win)
+        for i in valid_actions:
+          if i["action"] == opp_model_action:
+            action = i["action"]
+            return action 
 
     #there is not enough data to declare action
     #put honest player here
@@ -101,7 +118,7 @@ class NovicePlayer(BasePokerPlayer):
           action = valid_actions[1]['action']
       else:
           action = valid_actions[0]['action']
-    return action 
+      return action 
 
   def receive_game_start_message(self, game_info):
     pass
@@ -152,7 +169,7 @@ class NovicePlayer(BasePokerPlayer):
           community_card.pop()
           update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
           node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = 0.2 #NovicePlayer.lookupProb(opp_card, community_card)
+          pro_win_opp = self.lookupProb(opp_card, community_card)
           node.history_cell.update_action_frequency_cell(pro_win_opp)
           self.update_call_raise_EHS(round_state, 1, pro_win_opp)
 
@@ -177,11 +194,10 @@ class NovicePlayer(BasePokerPlayer):
     key = suitKey + "_" + valueKey
     return key
       
-  @staticmethod
-  def lookupProb(holeCards, commCards):
+  def lookupProb(self, holeCards, commCards):
     key = NovicePlayer.mapCardsToKey(holeCards, [])
     if len(commCards) > 0: key += "_" + NovicePlayer.mapCardsToKey(holeCards, commCards)
-    return float(NovicePlayer.TABLE[key])
+    return float(self.TABLE[key])
   
   def update_opp_model(self):
     call_mean = PlayerUtil.calculate_mean(self.callEHS)
@@ -433,7 +449,7 @@ class HistoryCell:
     total = 0.0
     #call probability
     for i in range(int(math.floor(opp_model[0]*10)), int(math.floor(opp_model[1]*10))):
-      total += prob_win_frequency_cell[i]
+      total += self.prob_win_frequency_cell[i]
     
     callPr = float(total)/self.total_data_point
     return [1 - callPr, callPr]
@@ -527,7 +543,6 @@ class SequenceActionTree:
               parent.eva += child.eva*pr_opp_action[1]
         else:
           pr_opp_action = child_with_history_cell.history_cell.pr_EHS_range(opp_model)
-          print(pr_opp_action)
           for child in child_list:
             if child.name[len(child.name)-1] == "f":
               parent.eva += child.eva*pr_opp_action[0]
@@ -538,34 +553,13 @@ class SequenceActionTree:
     self.push_eva(current_node, parent_list, opp_model)
 
 
-  def declare_action(self, hole_card, current_node, depth, opp_model, round_state):
-    #max eva of the child using level transverse
-    action = None
-    cut_off_nodes = list(self.all_leaf_node_need_eva(current_node, depth))
-    
-    if self.check_opp_model_availability(cut_off_nodes) == False:
-      return action
-    
-    if round_state['street'] == "flop":
-      #precompute go here, fix this
-      print("Timeout here") 
-      pro_win = 0.3 #NovicePlayer.lookupProb(hole_card, round_state['community_card']) 
-    else:
-      pro_win = estimate_hole_card_win_rate(
-          nb_simulation=100,
-          nb_player=2,
-          hole_card=gen_cards(hole_card),
-          community_card=gen_cards(round_state['community_card'])
-      )
-    
+  def declare_action(self, hole_card, current_node, depth, opp_model, round_state, cut_off_nodes, prob_win):
     #compute evaluation for cutoff nodes
     for node in cut_off_nodes:
       if node.name[len(node.name) - 1] != "f":
         node.eva = 10#Evaluation funcion here
 
     self.push_eva(current_node, cut_off_nodes, opp_model)
-    print("declare using opp adaptive model")
-    print("")
     
     child_list = list(search.findall(current_node, filter_=lambda child: child.parent == current_node, maxlevel = 2))
     max_eva = max(child.eva for child in child_list)
