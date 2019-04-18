@@ -1,9 +1,7 @@
 from pypokerengine.api.game import setup_config, start_poker
 from randomplayer import RandomPlayer
 from raise_player import RaisedPlayer
-from custom.minimax_player import MiniMaxPlayer
-from custom.honest_player import HonestPlayer
-from custom.honest_player2 import HonestPlayer2
+from honest_player import HonestPlayer
 from custom.call_player import CallPlayer
 from NovicePlayer import NovicePlayer
 
@@ -22,12 +20,10 @@ import os
 #logger = startLogging(logFile)
 
 #TODO:config the config as our wish
-config = setup_config(max_round=1, initial_stack=3000, small_blind_amount=10)
+config = setup_config(max_round=1000, initial_stack=10000, small_blind_amount=20)
 
-
-#config.register_player(name="NoviceOpponentModelPlayer", algorithm=NovicePlayer())
 config.register_player(name="NovicePlayer", algorithm=NovicePlayer())
-config.register_player(name="RaisedPlayer", algorithm=RaisedPlayer())
+config.register_player(name="HonestPlayer", algorithm=HonestPlayer())
+#config.register_player(name="NovicePlayer", algorithm=NovicePlayer())
 
-
-game_result = start_poker(config, verbose=1)
+game_result = start_poker(config, verbose=0)

@@ -84,7 +84,6 @@ def chanceNode(holeCards, commCards, oppCards, potAmt, depth):
   return expectedPayout
 
 
-
 def mapCardsToKey(holeCards, commCards):
   SUITS = ['D','C','H','S']
   VALUES = ['A','K','Q','J','T'] + [str(i) for i in range(9,1,-1)]

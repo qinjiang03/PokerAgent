@@ -11,14 +11,16 @@ from argparse import ArgumentParser
 """ =========== *Remember to import your agent!!! =========== """
 from randomplayer import RandomPlayer
 from raise_player import RaisedPlayer
+from NovicePlayer import NovicePlayer
+from honest_player import HonestPlayer
 # from smartwarrior import SmartWarrior
 """ ========================================================= """
 
 def testperf(agent_name1, agent1, agent_name2, agent2):		
 
 	# Init to play 500 games of 1000 rounds
-	num_game = 500
-	max_round = 1000
+	num_game = 50
+	max_round = 1000	
 	initial_stack = 10000
 	smallblind_amount = 20
 
@@ -30,8 +32,8 @@ def testperf(agent_name1, agent1, agent_name2, agent2):
 	config = setup_config(max_round=max_round, initial_stack=initial_stack, small_blind_amount=smallblind_amount)
 	
 	# Register players
-	config.register_player(name=agent_name1, algorithm=RandomPlayer())
-	config.register_player(name=agent_name2, algorithm=RaisedPlayer())
+	config.register_player(name=agent_name1, algorithm=NovicePlayer())
+	config.register_player(name=agent_name2, algorithm=HonestPlayer())
 
 	# Start playing num_game games
 	for game in range(1, num_game+1):

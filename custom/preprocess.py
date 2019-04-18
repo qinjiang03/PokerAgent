@@ -107,9 +107,6 @@ def monteCarloSimulation(file, nSims):
             writer.writerow([holeCards, commCards, row["Key"], win_rate])
     return
 
-
-
-
 if __name__ == "__main__":
     # genUniqCombins2(4)
     
