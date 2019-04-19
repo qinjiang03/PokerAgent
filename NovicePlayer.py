@@ -12,12 +12,8 @@ from anytree.importer import DictImporter, JsonImporter
 from pypokerengine.utils.card_utils import gen_cards, estimate_hole_card_win_rate
 from custom import helper_functions as helper
 
-<<<<<<< HEAD
-import Queue as queue
-=======
 #import torch
 import queue
->>>>>>> upstream/novice_player
 import random as rand
 import pprint
 import numpy
@@ -28,10 +24,6 @@ import csv
 import os
 
 class NovicePlayer(BasePokerPlayer):
-<<<<<<< HEAD
-  
-=======
->>>>>>> upstream/novice_player
   def __init__(self):
     
     #for call and raise only, since you cannot observe opponent hand when his fold
@@ -64,23 +56,14 @@ class NovicePlayer(BasePokerPlayer):
     self.hole_card = None
     self.player_position = None
     self.player_uuid = None
-<<<<<<< HEAD
-    
-    print("Reading table...")
-=======
     self.total_decision = 0
     self.adaptive_decision = 0
 
     #open precompute prob
->>>>>>> upstream/novice_player
     filename = "custom/prob.csv"
     with open(filename,'r') as file:
         reader = csv.reader(file)
         self.TABLE = {rows[0]:rows[1] for rows in reader}
-<<<<<<< HEAD
-    print("End of init")
-=======
->>>>>>> upstream/novice_player
 
     #print self.action_tree.no_nodes
     #print(RenderTree(self.action_tree.root, style=ContStyle()).by_attr("name"))
@@ -90,7 +73,7 @@ class NovicePlayer(BasePokerPlayer):
     #   row.node.round_state.player_state.print_player()
     #   print(" ")
     
-  def declare_action(self, valid_actions, hole_card, round_state):    
+  def declare_action(self, valid_actions, hole_card, round_state):  
     #run one to know if we are small blind or big blind
     if round_state['street'] == "preflop" and self.player_position == None:
       if len(round_state['action_histories']['preflop']) > 2:
@@ -184,41 +167,6 @@ class NovicePlayer(BasePokerPlayer):
           community_card = copy.deepcopy(round_state['community_card'])
           try:
           #river
-<<<<<<< HEAD
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
-          pro_win_opp = estimate_hole_card_win_rate(
-              nb_simulation=100,
-              nb_player=2,
-              hole_card=gen_cards(opp_card),
-              community_card=gen_cards(community_card)
-          )
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 3, pro_win_opp)
-
-          #turn
-          community_card.pop()
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 2) 
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = estimate_hole_card_win_rate(
-              nb_simulation=100,
-              nb_player=2,
-              hole_card=gen_cards(opp_card),
-              community_card=gen_cards(community_card)
-          )
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 2, pro_win_opp)
-
-          #flop
-          community_card.pop()
-          update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 1) 
-          node = self.action_tree.search_node_by_name(update_node_action_sequence)
-          pro_win_opp = self.lookupProb(opp_card, community_card)
-          node.history_cell.update_action_frequency_cell(pro_win_opp)
-          self.update_call_raise_EHS(round_state, 1, pro_win_opp)
-
-          self.update_opp_model()
-=======
             update_node_action_sequence = self.leaf_node_sequence_at_street(round_state, 3)
             pro_win_opp = estimate_hole_card_win_rate(
                 nb_simulation=100,
@@ -254,7 +202,6 @@ class NovicePlayer(BasePokerPlayer):
             self.update_opp_model()
           except AttributeError as e:
             print(update_node_action_sequence)
->>>>>>> upstream/novice_player
 
     #reset variable here
     self.action_sequence = ""
@@ -275,13 +222,8 @@ class NovicePlayer(BasePokerPlayer):
     return key
       
   def lookupProb(self, holeCards, commCards):
-<<<<<<< HEAD
-    key = NovicePlayer.mapCardsToKey(holeCards, [])
-    if len(commCards) > 0: key += "_" + NovicePlayer.mapCardsToKey(holeCards, commCards)
-=======
     key = self.mapCardsToKey(holeCards, [])
     if len(commCards) > 0: key += "_" + self.mapCardsToKey(holeCards, commCards)
->>>>>>> upstream/novice_player
     return float(self.TABLE[key])
   
   def update_opp_model(self):
@@ -643,31 +585,7 @@ class SequenceActionTree:
     self.push_eva(current_node, parent_list, opp_model)
 
 
-<<<<<<< HEAD
-  def declare_action(self, hole_card, current_node, depth, opp_model, round_state):
-    #max eva of the child using level transverse
-    action = None
-    cut_off_nodes = list(self.all_leaf_node_need_eva(current_node, depth))
-    
-    if self.check_opp_model_availability(cut_off_nodes) == False:
-      return action
-    
-    if round_state['street'] == "flop":
-      #precompute go here, fix this
-      print("Timeout here") 
-      print("############## SEQUENCE ACTION TREE: LOOK UP PROB ################")
-      pro_win = self.lookupProb(hole_card, round_state['community_card']) 
-    else:
-      pro_win = estimate_hole_card_win_rate(
-          nb_simulation=100,
-          nb_player=2,
-          hole_card=gen_cards(hole_card),
-          community_card=gen_cards(round_state['community_card'])
-      )
-    
-=======
   def declare_action(self, hole_card, current_node, depth, opp_model, round_state, cut_off_nodes, prob_win):
->>>>>>> upstream/novice_player
     #compute evaluation for cutoff nodes
     for node in cut_off_nodes:
       if node.name[len(node.name) - 1] != "f":
