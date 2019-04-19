@@ -68,7 +68,7 @@ class LearningPlayer(BasePokerPlayer):
             # the Bellman approximation
             self.SYNC_TARGET_FRAMES = 10**1
 
-            self.EPSILON_DECAY_LAST_FRAME = 10**3
+            self.EPSILON_DECAY_LAST_FRAME = 10.0**3
             self.EPSILON_START = 1.0
             self.EPSILON_FINAL = 0.02
 
